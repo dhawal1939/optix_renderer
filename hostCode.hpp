@@ -18,11 +18,32 @@
 // its acceleration structure, then ray traces it.
 
 // public owl node-graph API
-#include "owl/owl.h"
+#include <owl/owl.h>
+// viewer base class, for window and user interaction
+#include <owlViewer/OWLViewer.h>
+
 // our device-side data structures
 #include "deviceCode.h"
-// viewer base class, for window and user interaction
-#include "owlViewer/OWLViewer.h"
+
+// IMGUI 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
+//Geometry Headers
+#include <Model.h>
+
+
+// LTC LUT
+#include <ltc_lut.h>
+
+
+using namespace owl;
+
+
+// Compiled PTX code
+extern "C" char ltc_many_lights_cuda_ptx[];
+
 
 #define LOG(message)                                            \
   std::cout << OWL_TERMINAL_BLUE;                               \
@@ -35,39 +56,11 @@
 
 extern "C" char deviceCode_ptx[];
 
-const int NUM_VERTICES = 8;
-vec3f vertices[NUM_VERTICES] =
-  {
-    { -1.f,-1.f,-1.f },
-    { +1.f,-1.f,-1.f },
-    { -1.f,+1.f,-1.f },
-    { +1.f,+1.f,-1.f },
-    { -1.f,-1.f,+1.f },
-    { +1.f,-1.f,+1.f },
-    { -1.f,+1.f,+1.f },
-    { +1.f,+1.f,+1.f }
-  };
-
-const int NUM_INDICES = 12;
-vec3i indices[NUM_INDICES] =
-  {
-    { 0,1,3 }, { 2,3,0 },
-    { 5,7,6 }, { 5,6,4 },
-    { 0,4,5 }, { 0,5,1 },
-    { 2,3,7 }, { 2,7,6 },
-    { 1,5,7 }, { 1,7,3 },
-    { 4,0,2 }, { 4,2,6 }
-  };
-
 // const vec2i fbSize(800,600);
 const vec3f init_lookFrom(-4.f,+3.f,-2.f);
 const vec3f init_lookAt(0.f,0.f,0.f);
 const vec3f init_lookUp(0.f,1.f,0.f);
 const float init_cosFovy = 0.66f;
-
-
-
-
 
 
 struct Viewer : public owl::viewer::OWLViewer
@@ -256,21 +249,3 @@ void Viewer::render()
   owlRayGenLaunch2D(rayGen,fbSize.x,fbSize.y);
 }
 
-
-int main(int ac, char **av)
-{
-  LOG("owl::ng example '" << av[0] << "' starting up");
-
-  Viewer viewer;
-  viewer.camera.setOrientation(init_lookFrom,
-                               init_lookAt,
-                               init_lookUp,
-                               owl::viewer::toDegrees(acosf(init_cosFovy)));
-  viewer.enableFlyMode();
-  viewer.enableInspectMode(owl::box3f(vec3f(-1.f),vec3f(+1.f)));
-
-  // ##################################################################
-  // now that everything is ready: launch it ....
-  // ##################################################################
-  viewer.showAndRun();
-}

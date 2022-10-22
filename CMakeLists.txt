@@ -11,12 +11,14 @@ if(CUDA_TOOLKIT_ROOT_DIR)
   )
 endif()
 
-
 set(CMAKE_BUILD_TYPE_INIT "Release")
 
-project(ltc_ratio_estimator VERSION 0.0.1 LANGUAGES C CXX CUDA)
+set(CMAKE_TOOLCHAIN_FILE $ENV{VCPKG_CMAKE_PATH})
 
-set(OptiX_ROOT_DIR "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.5.0/")
+message(STATUS "${CMAKE_TOOLCHAIN_FILE}")
+
+
+project(optix_renderer VERSION 0.0.1 LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,28 +30,27 @@ add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
 find_package(imgui CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 
-# hardcoding it for quick fix
-set( GLFW3_LIBRARY "C:/Users/dhawals/repos/vcpkg/installed/x64-windows/lib/glfw3dll.lib")
+find_library( GLFW3_LIBRARY glfw3)
 
-message(STATUS "${GLFW3_LIBRARY}")
 
+include_directories(ltc common)
 
 embed_ptx(
   OUTPUT_TARGET
-    ltc_ratio_estimator_ptx
+    optix_renderer_ptx
   PTX_LINK_LIBRARIES
     owl::owl
   SOURCES
     deviceCode.cu
 )
 
-add_executable(ltc_ratio_estimator hostCode.cpp)
+add_executable(optix_renderer hostCode.cpp)
 
-target_link_libraries(ltc_ratio_estimator
+target_link_libraries(optix_renderer
   PRIVATE
-    ltc_ratio_estimator_ptx
+    optix_renderer_ptx
+    glfw
     owl::owl
     imgui::imgui
-    ${GLFW3_LIBRARY}
     owl_viewer
 )
