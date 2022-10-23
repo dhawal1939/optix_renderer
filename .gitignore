@@ -1,3 +1,5 @@
+.vscode/**
 **/build
-owl
-owl/**
+lib/owl
+lib/owl/**
+scenes/**

@@ -23,7 +23,7 @@ project(optix_renderer VERSION 0.0.1 LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(owl_dir ${PROJECT_SOURCE_DIR}/owl)
+set(owl_dir ${PROJECT_SOURCE_DIR}/libs/owl)
 add_subdirectory(${owl_dir} EXCLUDE_FROM_ALL)
 
 # Find Packages required
@@ -33,7 +33,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_library( GLFW3_LIBRARY glfw3)
 
 
-include_directories(ltc common)
+include_directories(include)
 
 embed_ptx(
   OUTPUT_TARGET
@@ -41,10 +41,10 @@ embed_ptx(
   PTX_LINK_LIBRARIES
     owl::owl
   SOURCES
-    deviceCode.cu
+    src/deviceCode.cu
 )
 
-add_executable(optix_renderer hostCode.cpp)
+add_executable(optix_renderer src/hostCode.cpp)
 
 target_link_libraries(optix_renderer
   PRIVATE
