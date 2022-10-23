@@ -2,7 +2,8 @@
 
 void Scene::syncLights()
 {
-    for (auto light : this->triLights->meshes) {
+    for (auto light : this->triLights->meshes)
+    {
         light->isLight = true;
         this->model->meshes.push_back(light);
     }
@@ -13,14 +14,16 @@ Returns:
 true - scene loaded
 false - scene load failed
 */
-bool parseScene(std::string sceneFile, Scene& scene)
+bool parseScene(std::string sceneFile, Scene &scene)
 {
     nlohmann::json sceneConfig;
-    try {
+    try
+    {
         std::ifstream sceneStream(sceneFile.c_str());
         sceneStream >> sceneConfig;
     }
-    catch (std::runtime_error e) {
+    catch (std::runtime_error e)
+    {
         LOG("Could not load scene .json file");
         return false;
     }
@@ -36,19 +39,24 @@ bool parseScene(std::string sceneFile, Scene& scene)
     scene.renderStatsOutput = sceneConfig["render_stats"];
 
     // Setup different types of renderers
-    try {
-        for (auto renderer : sceneConfig["renderers"]) {
+    try
+    {
+        for (auto renderer : sceneConfig["renderers"])
+        {
             scene.renderers.push_back(renderer);
         }
     }
-    catch (nlohmann::json::exception e) {
+    catch (nlohmann::json::exception e)
+    {
         LOG("No renderers defined.");
         return false;
     }
 
     // Setup camera, if none present, throw an exception
-    try {
-        for (auto camera : sceneConfig["cameras"]) {
+    try
+    {
+        for (auto camera : sceneConfig["cameras"])
+        {
             SceneCamera cam;
 
             cam.from = vec3f(camera["from"][0], camera["from"][1], camera["from"][2]);
@@ -59,26 +67,31 @@ bool parseScene(std::string sceneFile, Scene& scene)
             scene.cameras.push_back(cam);
         }
     }
-    catch (nlohmann::json::exception e) {
+    catch (nlohmann::json::exception e)
+    {
         LOG("No cameras defined.");
         return false;
     }
 
     // Load .obj file of surface, if not defined, throw exception
-    try {
+    try
+    {
         scene.model = loadOBJ(sceneConfig["surface_geometry"]);
     }
-    catch (nlohmann::json::exception e) {
+    catch (nlohmann::json::exception e)
+    {
         LOG("No .obj file given/found!");
         return false;
     }
 
     // Load .obj file of area lights
-    try {
+    try
+    {
         scene.triLights = loadOBJ(sceneConfig["area_lights"]);
         scene.syncLights();
     }
-    catch (nlohmann::json::exception e) {
+    catch (nlohmann::json::exception e)
+    {
         LOG("No .obj file for area lights given/found!");
         return false;
     }

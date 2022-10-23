@@ -79,8 +79,6 @@ struct Viewer : public owl::viewer::OWLViewer
     OWLRayGen rayGen{0};
     OWLMissProg missProg{0};
 
-    OWLContext context{0};
-
     // Buffers
     OWLBuffer accumBuffer{0};
     OWLBuffer UBuffer{0};
@@ -156,13 +154,13 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
     owlBufferResize(this->UBuffer, this->getWindowSize().x * this->getWindowSize().y);
 
     // Is it type of rays
-    owlContextSetRayTypeCount(context, 2);
+    owlContextSetRayTypeCount(this->context, 2);
 
     /*
           LIGHT Geometry reader
     */
 
-    Model *tri_lights = scene.triLights;
+    Model *tri_lights = scene.tri_lights;
 
     int total_triangles;
 

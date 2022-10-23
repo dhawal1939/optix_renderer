@@ -10,10 +10,11 @@ using namespace owl;
 #define PI 3.1415926f
 #define MAX_LTC_LIGHTS 20
 
-enum RendererType {
-	DIFFUSE=0,
-	ALPHA=1,
-	NORMALS=2,
+enum RendererType
+{
+	DIFFUSE = 0,
+	ALPHA = 1,
+	NORMALS = 2,
 	DIRECT_LIGHT_LSAMPLE,
 	DIRECT_LIGHT_BRDFSAMPLE,
 	DIRECT_LIGHT_MIS,
@@ -22,24 +23,24 @@ enum RendererType {
 	NUM_RENDERER_TYPES
 };
 
-const char* rendererNames[NUM_RENDERER_TYPES] = {   "Diffuse", 
-                                                    "Alpha", 
-                                                    "Normals", 
-    												"Direct Light (Light IS)", 
-                                                    "Direct Light (BRDF IS)", 
-                                                    "Direct Light (Light n BRDF MIS)",
-    												"LTC Baseline", 
-    												"Ratio"};
+const char *rendererNames[NUM_RENDERER_TYPES] = {"Diffuse",
+												 "Alpha",
+												 "Normals",
+												 "Direct Light (Light IS)",
+												 "Direct Light (BRDF IS)",
+												 "Direct Light (Light n BRDF MIS)",
+												 "LTC Baseline",
+												 "Ratio"};
 
-__inline__ __host__
-bool CHECK_IF_LTC(RendererType renderer_type)
+__inline__ __host__ bool CHECK_IF_LTC(RendererType renderer_type)
 {
-	switch (renderer_type) {
-		case LTC_BASELINE:
-		case RATIO:
-			return true;
-		default:
-			return false;
+	switch (renderer_type)
+	{
+	case LTC_BASELINE:
+	case RATIO:
+		return true;
+	default:
+		return false;
 	}
 }
 
@@ -51,7 +52,8 @@ typedef RayT<0, 2> RadianceRay;
 typedef RayT<1, 2> ShadowRay;
 #endif
 
-struct TriLight {
+struct TriLight
+{
 	vec3f aabbMin = vec3f(1e30f);
 	vec3f aabbMax = vec3f(-1e30f);
 
@@ -64,14 +66,15 @@ struct TriLight {
 	float area;
 };
 
-struct MeshLight {
+struct MeshLight
+{
 	vec3f aabbMin = vec3f(1e30f);
 	vec3f aabbMax = vec3f(-1e30f);
 	vec3f cg;
 	float flux;
 
 	int triIdx;
-  	int triStartIdx;
+	int triStartIdx;
 	int triCount;
 
 	int edgeStartIdx;
@@ -81,23 +84,25 @@ struct MeshLight {
 	int bvhHeight;
 };
 
-struct LaunchParams {
-	float4* accumBuffer;
-	float4* UBuffer;
-	float4* SBuffer;
+struct LaunchParams
+{
+	float4 *accumBuffer;
+	float4 *UBuffer;
+	float4 *SBuffer;
 	int accumId;
 
 	int rendererType;
 	OptixTraversableHandle world;
 	cudaTextureObject_t ltc_1, ltc_2, ltc_3;
 
-	TriLight* triLights;
+	TriLight *triLights;
 	int numTriLights;
 
-	MeshLight* meshLights;
+	MeshLight *meshLights;
 	int numMeshLights;
 
-	struct {
+	struct
+	{
 		vec3f pos;
 		vec3f dir_00;
 		vec3f dir_du;
@@ -109,16 +114,18 @@ struct LaunchParams {
 
 __constant__ LaunchParams optixLaunchParams;
 
-struct RayGenData {
-	uint32_t* frameBuffer;
+struct RayGenData
+{
+	uint32_t *frameBuffer;
 	vec2i frameBufferSize;
 };
 
-struct TriangleMeshData {
-	vec3f* vertex;
-	vec3f* normal;
-	vec3i* index;
-	vec2f* texCoord;
+struct TriangleMeshData
+{
+	vec3f *vertex;
+	vec3f *normal;
+	vec3i *index;
+	vec2f *texCoord;
 
 	bool isLight;
 	vec3f emit;
@@ -132,32 +139,35 @@ struct TriangleMeshData {
 	cudaTextureObject_t alpha_texture;
 };
 
-struct MissProgData {
+struct MissProgData
+{
 	vec3f const_color;
 };
 
-struct ShadowRayData {
+struct ShadowRayData
+{
 	vec3f visibility = vec3f(0.f);
 	vec3f point = vec3f(0.f), normal = vec3f(0.f), cg = vec3f(0.f);
 	vec3f emit = vec3f(0.f);
 	float area = 0.f;
 };
 
-struct AABB { 
+struct AABB
+{
 	vec3f bmin = vec3f(1e30f);
-	vec3f bmax = vec3f(- 1e30f);
+	vec3f bmax = vec3f(-1e30f);
 
-	__inline__ __device__ __host__
-    void grow( vec3f p ) { bmin = owl::min( bmin, p ), bmax = owl::min( bmax, p ); }
+	__inline__ __device__ __host__ void grow(vec3f p) { bmin = owl::min(bmin, p), bmax = owl::min(bmax, p); }
 
-	__inline__ __device__ __host__ float area() 
-    { 
-        vec3f e = bmax - bmin; // box extent
-        return e.x * e.y + e.y * e.z + e.z * e.x; 
-    }
+	__inline__ __device__ __host__ float area()
+	{
+		vec3f e = bmax - bmin; // box extent
+		return e.x * e.y + e.y * e.z + e.z * e.x;
+	}
 };
 
-struct SurfaceInteraction {
+struct SurfaceInteraction
+{
 	bool hit = false;
 
 	vec3f p = vec3f(0.f);

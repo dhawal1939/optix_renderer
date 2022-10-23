@@ -41,6 +41,7 @@ embed_ptx(
   PTX_LINK_LIBRARIES
     owl::owl
   SOURCES
+    include/cuda_headers/common.cuh
     src/deviceCode.cu
 )
 
