@@ -37,7 +37,15 @@ namespace osc
 
         // material data:
         vec3f diffuse;
-        int diffuseTextureID{-1};
+        int diffuseTextureID{ -1 };
+
+        float alpha; // roughness
+        int alphaTextureID{ -1 };
+
+        vec3f emit;
+
+        // Is light
+        bool isLight{ false };
     };
 
     struct QuadLight
@@ -53,8 +61,8 @@ namespace osc
                 delete[] pixel;
         }
 
-        uint32_t *pixel{nullptr};
-        vec2i resolution{-1};
+        uint32_t* pixel{ nullptr };
+        vec2i resolution{ -1 };
     };
 
     struct Model
@@ -67,11 +75,11 @@ namespace osc
                 delete texture;
         }
 
-        std::vector<TriangleMesh *> meshes;
-        std::vector<Texture *> textures;
+        std::vector<TriangleMesh*> meshes;
+        std::vector<Texture*> textures;
         //! bounding box of all vertices in the model
         box3f bounds;
     };
 
-    Model *loadOBJ(const std::string &objFile);
+    Model* loadOBJ(const std::string& objFile);
 }

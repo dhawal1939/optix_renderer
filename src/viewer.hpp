@@ -21,22 +21,15 @@
 #include <owl/owl.h>
 // viewer base class, for window and user interaction
 #include <owlViewer/OWLViewer.h>
-
 #include <owl/common/math/vec.h>
+#include <owl/common/math/random.h>
 
 // our device-side data structures
 #include "deviceCode.h"
 
-// IMGUI
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-
 // Geometry Headers
 #include <Model.h>
 #include <scene.h>
-
-#include <cuda_headers/common.cuh>
 
 // ImGUI
 #include <imgui.h>
@@ -46,10 +39,9 @@
 // LTC LUT
 #include <ltc/ltc_lut.h>
 
-using namespace owl;
+#include <cuda_headers/common.cuh>
 
-// Compiled PTX code
-extern "C" char ltc_many_lights_cuda_ptx[];
+using namespace owl;
 
 #define LOG(message)                                            \
     std::cout << OWL_TERMINAL_BLUE;                             \
@@ -60,6 +52,7 @@ extern "C" char ltc_many_lights_cuda_ptx[];
     std::cout << "#owl.sample(main): " << message << std::endl; \
     std::cout << OWL_TERMINAL_DEFAULT;
 
+// Compiled PTX code
 extern "C" char deviceCode_ptx[];
 
 // const vec2i fbSize(800,600);
@@ -107,7 +100,7 @@ struct Viewer : public owl::viewer::OWLViewer
 
     /*! gets called whenever the viewer needs us to re-render out widget */
     void render() override;
-    void drawUI() override;
+    void drawUI();
 
     /*! window notifies us that we got resized. We HAVE to override
         this to know our actual render dimensions, and get pointer
@@ -164,7 +157,7 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
 
     int total_triangles;
 
-    for (auto light : this->tri_light_list->meshes)
+    for (auto light : tri_lights->meshes)
     {
         MeshLight meshLight;
         meshLight.flux = 0.f;
