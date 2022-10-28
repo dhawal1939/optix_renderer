@@ -19,8 +19,8 @@ struct Scene
 	std::string jsonFilePath;
 
 	// Scene contents
-	Model *model;
-	Model *tri_lights;
+	Model* model;
+	Model* tri_lights;
 	std::vector<int> renderers;
 	std::vector<SceneCamera> cameras;
 

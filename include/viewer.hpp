@@ -18,16 +18,17 @@
 // its acceleration structure, then ray traces it.
 
 // public owl node-graph API
-#include <owl/owl.h>
 // viewer base class, for window and user interaction
+#include <owl/owl.h>
 #include <owlViewer/OWLViewer.h>
 #include <owl/common/math/vec.h>
 #include <owl/common/math/random.h>
 
 // our device-side data structures
-#include "deviceCode.h"
+#include <deviceCode.cuh>
 
 // Geometry Headers
+#include <common.h>
 #include <Model.h>
 #include <scene.h>
 
@@ -37,28 +38,16 @@
 #include <imgui_impl_opengl3.h>
 
 // LTC LUT
-#include <ltc/ltc_lut.h>
-
-#include <cuda_headers/common.cuh>
-
-using namespace owl;
-
-#define LOG(message)                                            \
-    std::cout << OWL_TERMINAL_BLUE;                             \
-    std::cout << "#owl.sample(main): " << message << std::endl; \
-    std::cout << OWL_TERMINAL_DEFAULT;
-#define LOG_OK(message)                                         \
-    std::cout << OWL_TERMINAL_LIGHT_BLUE;                       \
-    std::cout << "#owl.sample(main): " << message << std::endl; \
-    std::cout << OWL_TERMINAL_DEFAULT;
+#include <ltc/ltc_isotropic.h>
+#include <cuda_include/common.cuh>
 
 // Compiled PTX code
 extern "C" char deviceCode_ptx[];
 
-// const vec2i fbSize(800,600);
-const vec3f init_lookFrom(-4.f, +3.f, -2.f);
-const vec3f init_lookAt(0.f, 0.f, 0.f);
-const vec3f init_lookUp(0.f, 1.f, 0.f);
+// const owl::common::vec2i fbSize(800,600);
+const owl::common::vec3f init_lookFrom(-4.f, +3.f, -2.f);
+const owl::common::vec3f init_lookAt(0.f, 0.f, 0.f);
+const owl::common::vec3f init_lookUp(0.f, 1.f, 0.f);
 const float init_cosFovy = 0.66f;
 
 struct Viewer : public owl::viewer::OWLViewer
@@ -69,18 +58,18 @@ struct Viewer : public owl::viewer::OWLViewer
     RendererType renderer_type;
     bool sbtDirty = true;
 
-    OWLRayGen rayGen{0};
-    OWLMissProg missProg{0};
+    OWLRayGen rayGen{ 0 };
+    OWLMissProg missProg{ 0 };
 
     // Buffers
-    OWLBuffer accumBuffer{0};
-    OWLBuffer UBuffer{0};
-    OWLBuffer SBuffer{0};
+    OWLBuffer accumBuffer{ 0 };
+    OWLBuffer UBuffer{ 0 };
+    OWLBuffer SBuffer{ 0 };
 
     OWLGroup world; // TLAS Top level accelration structure
 
-    OWLContext context{0};
-    OWLModule module{0};
+    OWLContext context{ 0 };
+    OWLModule module{ 0 };
 
     OWLParams launch_params;
 
@@ -91,7 +80,7 @@ struct Viewer : public owl::viewer::OWLViewer
 
     float lerp = 0.5f;
 
-    Viewer(Scene &scene, vec2i resolution, bool interactive, bool vsync);
+    Viewer(Scene& scene, owl::common::vec2i resolution, bool interactive, bool vsync);
 
     int imgui_init(bool _callbacks);
 
@@ -105,7 +94,7 @@ struct Viewer : public owl::viewer::OWLViewer
     /*! window notifies us that we got resized. We HAVE to override
         this to know our actual render dimensions, and get pointer
         to the device frame buffer that the viewer cated for us */
-    void resize(const vec2i &newSize) override;
+    void resize(const owl::common::vec2i& newSize) override;
 
     /*! this function gets called whenever any camera manipulator
       updates the camera. gets called AFTER all values have been updated */
@@ -116,17 +105,16 @@ int Viewer::imgui_init(bool _callbacks)
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     ImGui::StyleColorsDark();
 
     ImGui_ImplGlfw_InitForOpenGL(this->handle, true);
     ImGui_ImplOpenGL3_Init();
     return ImGui_ImplOpenGL3_Init();
-    ;
 }
 
-Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsync = false)
+Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = true, bool vsync = false)
     : owl::viewer::OWLViewer("Optix Viewer", resolution, interactive, vsync)
 {
 
@@ -134,15 +122,15 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
     if (!this->imgui_init(true))
         LOG("IMGUI Init Failed")
 
-    // create a context on the first device:
-    this->context = owlContextCreate(nullptr, 1);
+        // create a context on the first device:
+        this->context = owlContextCreate(nullptr, 1);
     OWLModule module = owlModuleCreate(this->context, deviceCode_ptx);
 
     this->accumBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
     this->SBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
     this->UBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(this->accumBuffer,
-                    this->getWindowSize().x * this->getWindowSize().y);
+        this->getWindowSize().x * this->getWindowSize().y);
     owlBufferResize(this->SBuffer, this->getWindowSize().x * this->getWindowSize().y);
     owlBufferResize(this->UBuffer, this->getWindowSize().x * this->getWindowSize().y);
 
@@ -153,7 +141,7 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
           LIGHT Geometry reader
     */
 
-    Model *tri_lights = scene.tri_lights;
+    Model* tri_lights = scene.tri_lights;
 
     int total_triangles;
 
@@ -162,7 +150,6 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
         MeshLight meshLight;
         meshLight.flux = 0.f;
         meshLight.triIdx = this->tri_light_list.size();
-        meshLight.triStartIdx = total_triangles;
 
         int num_tris = 0;
 
@@ -193,7 +180,7 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
         mesh_light_list.push_back(meshLight);
 
         std::cout << std::endl
-                  << "**************" << std::endl;
+            << "**************" << std::endl;
     }
 
     OWLVarDecl launchParamsDecl[] = {
@@ -218,21 +205,21 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
         {"camera.dir_dv", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, camera.dir_dv)},
         // Random controls
         {"lerp", OWL_FLOAT, OWL_OFFSETOF(LaunchParams, lerp)},
-        {nullptr}};
+        {nullptr} };
     this->launch_params = owlParamsCreate(this->context,
-                                          sizeof(LaunchParams),
-                                          launchParamsDecl, -1);
+        sizeof(LaunchParams),
+        launchParamsDecl, -1);
 
     // Random controls
     owlParamsSet1f(this->launch_params, "lerp", this->lerp);
 
     // Set LTC matrices (8x8, since only isotropic)
     OWLTexture ltc1 = owlTexture2DCreate(this->context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_1,
-                                         OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
+        OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
     OWLTexture ltc2 = owlTexture2DCreate(this->context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_2,
-                                         OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
+        OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
     OWLTexture ltc3 = owlTexture2DCreate(this->context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_3,
-                                         OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
+        OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
 
     owlParamsSet1i(this->launch_params, "rendererType", (int)this->renderer_type);
 
@@ -260,7 +247,7 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
 
     // Loop over meshes set up and Instance Accel. Structure and Geometry Accel. Structure
 
-    Model *model = scene.model;
+    Model* model = scene.model;
     for (auto mesh : model->meshes)
     {
 
@@ -286,18 +273,18 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
             {"alpha_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, alpha_texture)},
             {"hasAlphaTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, hasAlphaTexture)},
 
-            {nullptr}};
+            {nullptr} };
 
         // This defines the geometry type of the variables defined above.
         OWLGeomType triangleGeomType = owlGeomTypeCreate(context,
-                                                         /* Geometry type, in this case, a triangle mesh */
-                                                         OWL_GEOM_TRIANGLES,
-                                                         /* Size of CUDA struct */
-                                                         sizeof(TriangleMeshData),
-                                                         /* Binding to variables on the host */
-                                                         triangleGeomVars,
-                                                         /* num of variables, -1 implies sentinel is set */
-                                                         -1);
+            /* Geometry type, in this case, a triangle mesh */
+            OWL_GEOM_TRIANGLES,
+            /* Size of CUDA struct */
+            sizeof(TriangleMeshData),
+            /* Binding to variables on the host */
+            triangleGeomVars,
+            /* num of variables, -1 implies sentinel is set */
+            -1);
 
         // Defines the function name in .cu file, to be used for closest hit processing
         owlGeomTypeSetClosestHit(triangleGeomType, RADIANCE_RAY_TYPE, module, "triangleMeshCH");
@@ -318,38 +305,38 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
 
         // Set emission value, and more importantly, if the current mesh is a light
         owlGeomSet1b(triangleGeom, "isLight", mesh->isLight);
-        owlGeomSet3f(triangleGeom, "emit", owl3f{mesh->emit.x, mesh->emit.y, mesh->emit.z});
+        owlGeomSet3f(triangleGeom, "emit", owl3f{ mesh->emit.x, mesh->emit.y, mesh->emit.z });
 
         // Create CUDA buffers and upload them for diffuse and alpha textures
         if (mesh->diffuseTextureID != -1)
         {
-            Texture *diffuseTexture = model->textures[mesh->diffuseTextureID];
+            Texture* diffuseTexture = model->textures[mesh->diffuseTextureID];
             OWLTexture diffuseTextureBuffer = owlTexture2DCreate(context,
-                                                                 OWL_TEXEL_FORMAT_RGBA8,
-                                                                 diffuseTexture->resolution.x,
-                                                                 diffuseTexture->resolution.y,
-                                                                 diffuseTexture->pixel,
-                                                                 OWL_TEXTURE_NEAREST,
-                                                                 OWL_TEXTURE_CLAMP);
+                OWL_TEXEL_FORMAT_RGBA8,
+                diffuseTexture->resolution.x,
+                diffuseTexture->resolution.y,
+                diffuseTexture->pixel,
+                OWL_TEXTURE_NEAREST,
+                OWL_TEXTURE_CLAMP);
             owlGeomSetTexture(triangleGeom, "diffuse_texture", diffuseTextureBuffer);
             owlGeomSet1b(triangleGeom, "hasDiffuseTexture", true);
         }
         else
         {
-            owlGeomSet3f(triangleGeom, "diffuse", owl3f{mesh->diffuse.x, mesh->diffuse.y, mesh->diffuse.z});
+            owlGeomSet3f(triangleGeom, "diffuse", owl3f{ mesh->diffuse.x, mesh->diffuse.y, mesh->diffuse.z });
             owlGeomSet1b(triangleGeom, "hasDiffuseTexture", false);
         }
 
         if (mesh->alphaTextureID != -1)
         {
-            Texture *alphaTexture = model->textures[mesh->alphaTextureID];
+            Texture* alphaTexture = model->textures[mesh->alphaTextureID];
             OWLTexture alphaTextureBuffer = owlTexture2DCreate(context,
-                                                               OWL_TEXEL_FORMAT_RGBA8,
-                                                               alphaTexture->resolution.x,
-                                                               alphaTexture->resolution.y,
-                                                               alphaTexture->pixel,
-                                                               OWL_TEXTURE_NEAREST,
-                                                               OWL_TEXTURE_CLAMP);
+                OWL_TEXEL_FORMAT_RGBA8,
+                alphaTexture->resolution.x,
+                alphaTexture->resolution.y,
+                alphaTexture->pixel,
+                OWL_TEXTURE_NEAREST,
+                OWL_TEXTURE_CLAMP);
             owlGeomSetTexture(triangleGeom, "alpha_texture", alphaTextureBuffer);
             owlGeomSet1b(triangleGeom, "hasAlphaTexture", true);
         }
@@ -365,9 +352,9 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
 
         // Set vertices, indices and UV coords on the device
         owlTrianglesSetVertices(triangleGeom, vertexBuffer,
-                                mesh->vertex.size(), sizeof(vec3f), 0);
+            mesh->vertex.size(), sizeof(owl::common::vec3f), 0);
         owlTrianglesSetIndices(triangleGeom, indexBuffer,
-                               mesh->index.size(), sizeof(vec3i), 0);
+            mesh->index.size(), sizeof(owl::common::vec3i), 0);
 
         owlGeomSetBuffer(triangleGeom, "vertex", vertexBuffer);
         owlGeomSetBuffer(triangleGeom, "normal", normalBuffer);
@@ -395,12 +382,12 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
     // ====================================================
     OWLVarDecl missProgVars[] = {
         {"const_color", OWL_FLOAT3, OWL_OFFSETOF(MissProgData, const_color)},
-        {nullptr}};
+        {nullptr} };
 
     missProg = owlMissProgCreate(context, module, "miss", sizeof(MissProgData), missProgVars, -1);
 
     // Set a constant background color in the miss program (black for now)
-    owlMissProgSet3f(missProg, "const_color", owl3f{0.f, 0.f, 0.f});
+    owlMissProgSet3f(missProg, "const_color", owl3f{ 0.f, 0.f, 0.f });
 
     // ====================================================
     // Setup a pin-hole camera ray-gen program
@@ -408,7 +395,7 @@ Viewer::Viewer(Scene &scene, vec2i resolution, bool interactive = true, bool vsy
     OWLVarDecl rayGenVars[] = {
         {"frameBuffer", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData, frameBuffer)},
         {"frameBufferSize", OWL_INT2, OWL_OFFSETOF(RayGenData, frameBufferSize)},
-        {nullptr}};
+        {nullptr} };
 
     rayGen = owlRayGenCreate(context, module, "rayGen", sizeof(RayGenData), rayGenVars, -1);
     // Set the TLAS to be used
@@ -440,7 +427,7 @@ void Viewer::render()
 }
 
 /*! window notifies us that we got resized */
-void Viewer::resize(const vec2i &newSize)
+void Viewer::resize(const owl::common::vec2i& newSize)
 {
     // Resize framebuffer, and other ops (OWL::Viewer ops)
     OWLViewer::resize(newSize);
@@ -468,27 +455,27 @@ void Viewer::setRendererType(RendererType type)
 /*! window notifies us that the camera has changed */
 void Viewer::cameraChanged()
 {
-    const vec3f lookFrom = camera.getFrom();
-    const vec3f lookAt = camera.getAt();
-    const vec3f lookUp = camera.getUp();
+    const owl::common::vec3f lookFrom = camera.getFrom();
+    const owl::common::vec3f lookAt = camera.getAt();
+    const owl::common::vec3f lookUp = camera.getUp();
     const float cosFovy = camera.getCosFovy();
     // ----------- compute variable values  ------------------
-    vec3f camera_pos = lookFrom;
-    vec3f camera_d00 = normalize(lookAt - lookFrom);
+    owl::common::vec3f camera_pos = lookFrom;
+    owl::common::vec3f camera_d00 = normalize(lookAt - lookFrom);
     float aspect = fbSize.x / float(fbSize.y);
-    vec3f camera_ddu = cosFovy * aspect * normalize(cross(camera_d00, lookUp));
-    vec3f camera_ddv = cosFovy * normalize(cross(camera_ddu, camera_d00));
+    owl::common::vec3f camera_ddu = cosFovy * aspect * normalize(cross(camera_d00, lookUp));
+    owl::common::vec3f camera_ddv = cosFovy * normalize(cross(camera_ddu, camera_d00));
     camera_d00 -= 0.5f * camera_ddu;
     camera_d00 -= 0.5f * camera_ddv;
 
     // ----------- set variables  ----------------------------
     owlRayGenSet1ul(rayGen, "fbPtr", (uint64_t)fbPointer);
     // owlRayGenSetBuffer(rayGen,"fbPtr",        frameBuffer);
-    owlRayGenSet2i(rayGen, "fbSize", (const owl2i &)fbSize);
-    owlRayGenSet3f(rayGen, "camera.pos", (const owl3f &)camera_pos);
-    owlRayGenSet3f(rayGen, "camera.dir_00", (const owl3f &)camera_d00);
-    owlRayGenSet3f(rayGen, "camera.dir_du", (const owl3f &)camera_ddu);
-    owlRayGenSet3f(rayGen, "camera.dir_dv", (const owl3f &)camera_ddv);
+    owlRayGenSet2i(rayGen, "fbSize", (const owl2i&)fbSize);
+    owlRayGenSet3f(rayGen, "camera.pos", (const owl3f&)camera_pos);
+    owlRayGenSet3f(rayGen, "camera.dir_00", (const owl3f&)camera_d00);
+    owlRayGenSet3f(rayGen, "camera.dir_du", (const owl3f&)camera_ddu);
+    owlRayGenSet3f(rayGen, "camera.dir_dv", (const owl3f&)camera_ddv);
     sbtDirty = true;
 }
 

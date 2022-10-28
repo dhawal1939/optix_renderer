@@ -3,7 +3,7 @@
 #include "viewer.hpp"
 
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     std::string savePath;
     bool isInteractive = false;
@@ -36,9 +36,9 @@ int main(int argc, char **argv)
     if (isInteractive)
     {
         win.camera.setOrientation(scene.cameras[0].from,
-                                  scene.cameras[0].at,
-                                  scene.cameras[0].up,
-                                  owl::viewer::toDegrees(acosf(scene.cameras[0].cosFovy)));
+            scene.cameras[0].at,
+            scene.cameras[0].up,
+            owl::viewer::toDegrees(acosf(scene.cameras[0].cosFovy)));
         win.enableFlyMode();
         win.enableInspectMode(owl::box3f(scene.model->bounds.lower, scene.model->bounds.upper));
         win.setWorldScale(length(scene.model->bounds.span()));

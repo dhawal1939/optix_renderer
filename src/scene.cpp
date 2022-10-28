@@ -1,8 +1,10 @@
+#include <common.cuh>
 #include "scene.h"
+#include <fstream>
 
 void Scene::syncLights()
 {
-    for (auto light : this->triLights->meshes)
+    for (auto light : this->tri_lights->meshes)
     {
         light->isLight = true;
         this->model->meshes.push_back(light);
@@ -14,7 +16,7 @@ Returns:
 true - scene loaded
 false - scene load failed
 */
-bool parseScene(std::string sceneFile, Scene &scene)
+bool parseScene(std::string sceneFile, Scene& scene)
 {
     nlohmann::json sceneConfig;
     try
@@ -35,8 +37,6 @@ bool parseScene(std::string sceneFile, Scene &scene)
     scene.spp = sceneConfig["spp"];
     scene.imgWidth = sceneConfig["width"];
     scene.imgHeight = sceneConfig["height"];
-    scene.renderOutput = sceneConfig["render_output"];
-    scene.renderStatsOutput = sceneConfig["render_stats"];
 
     // Setup different types of renderers
     try
@@ -87,7 +87,7 @@ bool parseScene(std::string sceneFile, Scene &scene)
     // Load .obj file of area lights
     try
     {
-        scene.triLights = loadOBJ(sceneConfig["area_lights"]);
+        scene.tri_lights = loadOBJ(sceneConfig["area_lights"]);
         scene.syncLights();
     }
     catch (nlohmann::json::exception e)
