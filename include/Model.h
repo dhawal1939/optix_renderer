@@ -23,26 +23,23 @@
 /*! \namespace osc - Optix Siggraph Course */
 namespace osc
 {
-    using namespace owl;
-    using namespace owl::common;
-
     /*! a simple indexed triangle mesh that our sample renderer will
         render */
     struct TriangleMesh
     {
-        std::vector<vec3f> vertex;
-        std::vector<vec3f> normal;
-        std::vector<vec2f> texcoord;
-        std::vector<vec3i> index;
+        std::vector<owl::common::vec3f> vertex;
+        std::vector<owl::common::vec3f> normal;
+        std::vector<owl::common::vec2f> texcoord;
+        std::vector<owl::common::vec3i> index;
 
         // material data:
-        vec3f diffuse;
+        owl::common::vec3f diffuse;
         int diffuseTextureID{ -1 };
 
         float alpha; // roughness
         int alphaTextureID{ -1 };
 
-        vec3f emit;
+        owl::common::vec3f emit;
 
         // Is light
         bool isLight{ false };
@@ -50,7 +47,7 @@ namespace osc
 
     struct QuadLight
     {
-        vec3f origin, du, dv, power;
+        owl::common::vec3f origin, du, dv, power;
     };
 
     struct Texture
@@ -62,7 +59,7 @@ namespace osc
         }
 
         uint32_t* pixel{ nullptr };
-        vec2i resolution{ -1 };
+        owl::common::vec2i resolution{ -1 };
     };
 
     struct Model
@@ -78,7 +75,7 @@ namespace osc
         std::vector<TriangleMesh*> meshes;
         std::vector<Texture*> textures;
         //! bounding box of all vertices in the model
-        box3f bounds;
+        owl::box3f bounds;
     };
 
     Model* loadOBJ(const std::string& objFile);

@@ -55,9 +55,9 @@ namespace osc {
         if (knownVertices.find(idx) != knownVertices.end())
             return knownVertices[idx];
 
-        const vec3f* vertex_array = (const vec3f*)attributes.vertices.data();
-        const vec3f* normal_array = (const vec3f*)attributes.normals.data();
-        const vec2f* texcoord_array = (const vec2f*)attributes.texcoords.data();
+        const owl::common::vec3f* vertex_array = (const owl::common::vec3f*)attributes.vertices.data();
+        const owl::common::vec3f* normal_array = (const owl::common::vec3f*)attributes.normals.data();
+        const owl::common::vec2f* texcoord_array = (const owl::common::vec2f*)attributes.texcoords.data();
 
         int newID = (int)mesh->vertex.size();
         knownVertices[idx] = newID;
@@ -95,7 +95,7 @@ namespace osc {
             if (c == '\\') c = '/';
         fileName = modelPath + "/" + fileName;
 
-        vec2i res;
+        owl::common::vec2i res;
         int   comp;
         unsigned char* image = stbi_load(fileName.c_str(),
             &res.x, &res.y, &comp, STBI_rgb_alpha);
@@ -177,16 +177,16 @@ namespace osc {
                     tinyobj::index_t idx1 = shape.mesh.indices[3 * faceID + 1];
                     tinyobj::index_t idx2 = shape.mesh.indices[3 * faceID + 2];
 
-                    vec3i idx(addVertex(mesh, attributes, idx0, knownVertices),
+                    owl::common::vec3i idx(addVertex(mesh, attributes, idx0, knownVertices),
                         addVertex(mesh, attributes, idx1, knownVertices),
                         addVertex(mesh, attributes, idx2, knownVertices));
                     mesh->index.push_back(idx);
                     if (materialID < 0) {
-                        mesh->diffuse = vec3f(1, 0, 0);
+                        mesh->diffuse = owl::common::vec3f(1, 0, 0);
                         mesh->diffuseTextureID = -1;
                     }
                     else {
-                        mesh->diffuse = (const vec3f&)materials[materialID].diffuse;
+                        mesh->diffuse = (const owl::common::vec3f&)materials[materialID].diffuse;
                         mesh->diffuseTextureID = loadTexture(model,
                             knownTextures,
                             materials[materialID].diffuse_texname,

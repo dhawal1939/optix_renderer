@@ -68,9 +68,7 @@ set_target_properties(optix_renderer_ptx PROPERTIES CUDA_ARCHITECTURES "86")
 
 add_executable(optix_renderer 
                ${HEADERS}
-               ${SOURCES}
-               ${CUDA_HEADERS}
-               ${CUDA_SOURCES})
+               ${SOURCES})
 
 target_link_libraries(optix_renderer
   PRIVATE
