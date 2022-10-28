@@ -3,7 +3,6 @@
 #include <helper_math.cuh>
 
 #include <optix.h>
-#include <optix_device.h>
 
 #include <cuda_runtime.h>
 

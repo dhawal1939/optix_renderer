@@ -2,7 +2,6 @@
 #include <ostream>
 #include "viewer.hpp"
 
-
 int main(int argc, char** argv)
 {
     std::string savePath;
@@ -30,7 +29,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    vec2i resolution(scene.imgWidth, scene.imgHeight);
+    owl::common::vec2i resolution(scene.imgWidth, scene.imgHeight);
     Viewer win(scene, resolution, isInteractive);
 
     if (isInteractive)

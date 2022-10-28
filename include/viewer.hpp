@@ -41,10 +41,11 @@
 #include <ltc/ltc_isotropic.h>
 #include <cuda_include/common.cuh>
 
+// const owl::common::vec2i fbSize(800,600);
+
 // Compiled PTX code
 extern "C" char deviceCode_ptx[];
 
-// const owl::common::vec2i fbSize(800,600);
 const owl::common::vec3f init_lookFrom(-4.f, +3.f, -2.f);
 const owl::common::vec3f init_lookAt(0.f, 0.f, 0.f);
 const owl::common::vec3f init_lookUp(0.f, 1.f, 0.f);

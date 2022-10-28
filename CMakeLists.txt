@@ -57,14 +57,13 @@ include_directories(
 
 embed_ptx(
   OUTPUT_TARGET
-  optix_renderer_ptx
+  deviceCode_ptx
   PTX_LINK_LIBRARIES
   owl::owl
   SOURCES
+  ${CUDA_SOURCES}
   ${CUDA_HEADERS}
   )
-set_target_properties(optix_renderer_ptx PROPERTIES CUDA_ARCHITECTURES "86")
-
 
 add_executable(optix_renderer 
                ${HEADERS}
@@ -72,7 +71,7 @@ add_executable(optix_renderer
 
 target_link_libraries(optix_renderer
   PRIVATE
-    optix_renderer_ptx
+    deviceCode_ptx
     glfw
     owl::owl
     imgui::imgui
