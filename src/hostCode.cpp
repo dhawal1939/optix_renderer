@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     }
 
     owl::common::vec2i resolution(scene.imgWidth, scene.imgHeight);
-    Viewer win(scene, resolution, RATIO);
+    Viewer win(scene, resolution, LTC_BASELINE);
 
     if (isInteractive)
     {
