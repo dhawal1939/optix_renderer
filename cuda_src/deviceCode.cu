@@ -23,6 +23,33 @@
 #include <ltc/polygon_utils.cuh>
 
 
+
+
+OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCHShadow)()
+{
+    const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
+    const owl::common::vec3i primitiveIndices = self.index[optixGetPrimitiveIndex()];
+    ShadowRayData& srd = owl::getPRD<ShadowRayData>();
+
+    if (self.isLight) {
+        srd.visibility = owl::common::vec3f(1.f);
+        srd.point = barycentricInterpolate(self.vertex, primitiveIndices);
+        srd.normal = normalize(barycentricInterpolate(self.normal, primitiveIndices));
+        srd.emit = self.emit;
+
+        owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
+        owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
+        owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
+        srd.area = 0.5f * length(cross(v1 - v2, v3 - v2));
+
+        srd.cg = (v1 + v2 + v3) / 3.f;
+    }
+    else {
+        srd.visibility = owl::common::vec3f(0.f);
+    }
+
+}
+
 OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
 {
     const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
@@ -237,7 +264,7 @@ owl::common::vec3f estimateDirectLighting(SurfaceInteraction& si, LCGRand& rng, 
     owl::common::vec3f color = owl::common::vec3f(0.f);
 
     if (type == 0) {
-        int selectedTriLight = round(lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1));
+        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
         float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
 
         lightSample = sampleLightSource(si, selectedTriLight, lightSelectionPdf, rand1, false);
@@ -250,7 +277,7 @@ owl::common::vec3f estimateDirectLighting(SurfaceInteraction& si, LCGRand& rng, 
         color = brdfSample;
     }
     else if (type == 2) {
-        int selectedTriLight = round(lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1));
+        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
         float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
 
         brdfSample = sampleBRDF(si, lightSelectionPdf, rand1, true);
@@ -326,15 +353,18 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     owl::traceRay(optixLaunchParams.world, ray, si);
 
     owl::common::vec3f color(0.f, 0.f, 0.f);
-
+    //printf("%d\n", optixLaunchParams.rendererType);
     if (si.hit == false)
+    {
         color = si.diffuse;
+        color = si.n_geom;
+    }
     else if (optixLaunchParams.rendererType == DIFFUSE)
         color = si.diffuse;
     else if (optixLaunchParams.rendererType == ALPHA)
         color = si.alpha;
     else if (optixLaunchParams.rendererType == NORMALS)
-        color = 0.5f * (si.n_geom + 1.f);
+        color = si.n_geom;
     // Direct lighting with MC
     else if (optixLaunchParams.rendererType == DIRECT_LIGHT_LSAMPLE) {
         if (si.isLight)
@@ -379,6 +409,9 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         }
 
     }
+    else {
+        color = owl::common::vec3f(1., 0., 0.);
+    }
 
     if (optixLaunchParams.accumId > 0)
         color = color + owl::common::vec3f(optixLaunchParams.accumBuffer[fbOfs].x, optixLaunchParams.accumBuffer[fbOfs].y,
@@ -387,4 +420,6 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     optixLaunchParams.accumBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
     color = (1.f / (optixLaunchParams.accumId + 1)) * color;
     self.frameBuffer[fbOfs] = owl::make_rgba(color);
+
+    //self.frameBuffer[fbOfs] = owl::make_rgba(owl::common::vec3f(0., 1., 0.));
 }

@@ -16,8 +16,8 @@
 
 enum RendererType {
 	DIFFUSE = 0,
-	ALPHA,
-	NORMALS,
+	ALPHA = 1,
+	NORMALS = 2,
 	DIRECT_LIGHT_LSAMPLE,
 	DIRECT_LIGHT_BRDFSAMPLE,
 	DIRECT_LIGHT_MIS,
@@ -37,7 +37,8 @@ const char* rendererNames[NUM_RENDERER_TYPES] = {
 													"RATIO"
 };
 
-__inline__ __host__ bool CHECK_IF_LTC(RendererType t)
+__inline__ __host__
+bool CHECK_IF_LTC(RendererType t)
 {
 	switch (t) {
 	case LTC_BASELINE:
@@ -56,66 +57,24 @@ typedef owl::RayT<0, 2> RadianceRay;
 typedef owl::RayT<1, 2> ShadowRay;
 #endif
 
-
-struct SurfaceInteraction {
-	bool hit = false;
-
-	owl::common::vec3f p = owl::common::vec3f(0.f);
-	owl::common::vec2f uv = owl::common::vec2f(0.f);
-	owl::common::vec3f wo = owl::common::vec3f(0.f), wi = owl::common::vec3f(0.f);
-	owl::common::vec3f wo_local = owl::common::vec3f(0.f), wi_local = owl::common::vec3f(0.f);
-
-	owl::common::vec3f n_geom = owl::common::vec3f(0.f), n_shad = owl::common::vec3f(0.f);
-
-	owl::common::vec3f diffuse = owl::common::vec3f(0.f);
-	float alpha = 0.f;
-
-	owl::common::vec3f emit = owl::common::vec3f(0.f);
-	bool isLight = false;
-
-	owl::common::vec3f to_local[3], to_world[3];
-};
-
-struct LightBVH {
-	owl::common::vec3f aabbMin = owl::common::vec3f(1e30f);
-	owl::common::vec3f aabbMax = owl::common::vec3f(-1e30f);
-	owl::common::vec3f aabbMid = owl::common::vec3f(0.f);
-	float flux = 0.f;
-
-	uint32_t left = 0, right = 0;
-	uint32_t primIdx = 0, primCount = 0;
-};
-
 struct TriLight {
-	owl::common::vec3f aabbMin = owl::common::vec3f(1e30f);
-	owl::common::vec3f aabbMax = owl::common::vec3f(-1e30f);
-
 	owl::common::vec3f v1, v2, v3;
 	owl::common::vec3f cg;
 	owl::common::vec3f normal;
 	owl::common::vec3f emit;
 
-	float flux;
+	//float flux;
 	float area;
 };
 
 struct MeshLight {
-	owl::common::vec3f aabbMin = owl::common::vec3f(1e30f);
-	owl::common::vec3f aabbMax = owl::common::vec3f(-1e30f);
-	owl::common::vec3f cg;
 	float flux;
-
 	int triIdx;
 	int triCount;
-
-	int bvhIdx;
-	int bvhHeight;
 };
 
 struct LaunchParams {
 	float4* accumBuffer;
-	float4* UBuffer;
-	float4* SBuffer;
 	int accumId;
 
 	int rendererType;
@@ -127,10 +86,6 @@ struct LaunchParams {
 
 	MeshLight* meshLights;
 	int numMeshLights;
-
-	LightBVH* lightBlas;
-	LightBVH* lightTlas;
-	int lightTlasHeight;
 
 	struct {
 		owl::common::vec3f pos;
@@ -178,16 +133,22 @@ struct ShadowRayData {
 	float area = 0.f;
 };
 
-struct AABB {
-	owl::common::vec3f bmin = owl::common::vec3f(1e30f);
-	owl::common::vec3f bmax = owl::common::vec3f(-1e30f);
 
-	__inline__ __device__ __host__
-		void grow(owl::common::vec3f p) { bmin = owl::min(bmin, p), bmax = owl::min(bmax, p); }
+struct SurfaceInteraction {
+	bool hit = false;
 
-	__inline__ __device__ __host__ float area()
-	{
-		owl::common::vec3f e = bmax - bmin; // box extent
-		return e.x * e.y + e.y * e.z + e.z * e.x;
-	}
+	owl::common::vec3f p = owl::common::vec3f(0.f);
+	owl::common::vec2f uv = owl::common::vec2f(0.f);
+	owl::common::vec3f wo = owl::common::vec3f(0.f), wi = owl::common::vec3f(0.f);
+	owl::common::vec3f wo_local = owl::common::vec3f(0.f), wi_local = owl::common::vec3f(0.f);
+
+	owl::common::vec3f n_geom = owl::common::vec3f(0.f), n_shad = owl::common::vec3f(0.f);
+
+	owl::common::vec3f diffuse = owl::common::vec3f(0.f);
+	float alpha = 0.f;
+
+	owl::common::vec3f emit = owl::common::vec3f(0.f);
+	bool isLight = false;
+
+	owl::common::vec3f to_local[3], to_world[3];
 };

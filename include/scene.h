@@ -20,7 +20,7 @@ struct Scene
 
 	// Scene contents
 	Model* model;
-	Model* tri_lights;
+	Model* triLights;
 	std::vector<int> renderers;
 	std::vector<SceneCamera> cameras;
 

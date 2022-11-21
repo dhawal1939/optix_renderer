@@ -107,10 +107,11 @@ namespace osc {
             texture->pixel = (uint32_t*)image;
 
             /* iw - actually, it seems that stbi loads the pictures
-               mirrored along the y axis - mirror them here */
+                mirrored along the y axis - mirror them here */
             for (int y = 0; y < res.y / 2; y++) {
                 uint32_t* line_y = texture->pixel + y * res.x;
                 uint32_t* mirrored_y = texture->pixel + (res.y - 1 - y) * res.x;
+                int mirror_y = res.y - 1 - y;
                 for (int x = 0; x < res.x; x++) {
                     std::swap(line_y[x], mirrored_y[x]);
                 }
@@ -119,9 +120,7 @@ namespace osc {
             model->textures.push_back(texture);
         }
         else {
-            std::cout << OWL_TERMINAL_RED
-                << "Could not load texture from " << fileName << "!"
-                << OWL_TERMINAL_DEFAULT << std::endl;
+            std::cout << "Could not load texture from " << fileName;
         }
 
         knownTextures[inFileName] = textureID;
@@ -149,11 +148,16 @@ namespace osc {
                 objFile.c_str(),
                 modelDir.c_str(),
                 /* triangulate */true);
-        if (!readOK)
+        if (!readOK) {
             throw std::runtime_error("Could not read OBJ model from " + objFile + " : " + err);
+        }
 
         if (materials.empty())
             throw std::runtime_error("could not parse materials ...");
+
+        const owl::common::vec3f* vertex_array = (const owl::common::vec3f*)attributes.vertices.data();
+        const owl::common::vec3f* normal_array = (const owl::common::vec3f*)attributes.normals.data();
+        const owl::common::vec2f* texcoord_array = (const owl::common::vec2f*)attributes.texcoords.data();
 
         std::cout << "Done loading obj file - found " << shapes.size() << " shapes with " << materials.size() << " materials" << std::endl;
         std::map<std::string, int>      knownTextures;
@@ -169,47 +173,62 @@ namespace osc {
             for (int materialID : materialIDs) {
                 TriangleMesh* mesh = new TriangleMesh;
 
-                for (size_t faceID = 0; faceID < shape.mesh.material_ids.size(); faceID++) {
+                for (int faceID = 0; faceID < shape.mesh.material_ids.size(); faceID++) {
                     if (shape.mesh.material_ids[faceID] != materialID) continue;
-                    if (shape.mesh.num_face_vertices[faceID] != 3)
-                        throw std::runtime_error("not properly tessellated");
                     tinyobj::index_t idx0 = shape.mesh.indices[3 * faceID + 0];
                     tinyobj::index_t idx1 = shape.mesh.indices[3 * faceID + 1];
                     tinyobj::index_t idx2 = shape.mesh.indices[3 * faceID + 2];
 
-                    owl::common::vec3i idx(addVertex(mesh, attributes, idx0, knownVertices),
-                        addVertex(mesh, attributes, idx1, knownVertices),
-                        addVertex(mesh, attributes, idx2, knownVertices));
-                    mesh->index.push_back(idx);
-                    if (materialID < 0) {
-                        mesh->diffuse = owl::common::vec3f(1, 0, 0);
-                        mesh->diffuseTextureID = -1;
-                    }
-                    else {
-                        mesh->diffuse = (const owl::common::vec3f&)materials[materialID].diffuse;
-                        mesh->diffuseTextureID = loadTexture(model,
-                            knownTextures,
-                            materials[materialID].diffuse_texname,
-                            modelDir);
-                    }
+                    // owl::common::vec3i idx(addVertex(mesh, attributes, idx0, knownVertices),
+                    //     addVertex(mesh, attributes, idx1, knownVertices),
+                    //     addVertex(mesh, attributes, idx2, knownVertices));
+
+                    owl::common::vec3i vidx(mesh->vertex.size(), mesh->vertex.size() + 1, mesh->vertex.size() + 2);
+                    mesh->vertex.push_back(vertex_array[idx0.vertex_index]);
+                    mesh->vertex.push_back(vertex_array[idx1.vertex_index]);
+                    mesh->vertex.push_back(vertex_array[idx2.vertex_index]);
+                    mesh->index.push_back(vidx);
+
+                    owl::common::vec3i nidx(mesh->normal.size(), mesh->normal.size() + 1, mesh->normal.size() + 2);
+                    mesh->normal.push_back(normal_array[idx0.normal_index]);
+                    mesh->normal.push_back(normal_array[idx1.normal_index]);
+                    mesh->normal.push_back(normal_array[idx2.normal_index]);
+                    // mesh->index.push_back(nidx);
+
+                    owl::common::vec3i tidx(mesh->texcoord.size(), mesh->texcoord.size() + 1, mesh->texcoord.size() + 2);
+                    mesh->texcoord.push_back(texcoord_array[idx0.texcoord_index]);
+                    mesh->texcoord.push_back(texcoord_array[idx1.texcoord_index]);
+                    mesh->texcoord.push_back(texcoord_array[idx2.texcoord_index]);
+                    // mesh->index.push_back(tidx);
+
+                    mesh->diffuse = (const owl::common::vec3f&)materials[materialID].diffuse;
+                    mesh->diffuseTextureID = loadTexture(model,
+                        knownTextures,
+                        materials[materialID].diffuse_texname,
+                        modelDir);
+
+                    mesh->alpha = (const float)materials[materialID].shininess;
+                    mesh->alphaTextureID = loadTexture(model,
+                        knownTextures,
+                        materials[materialID].specular_highlight_texname,
+                        modelDir);
+
+                    mesh->emit = (const owl::common::vec3f&)materials[materialID].diffuse;
                 }
 
-                if (mesh->vertex.empty())
+                if (mesh->vertex.empty()) {
                     delete mesh;
+                }
                 else {
-                    // just for sanity's sake:
-                    if (mesh->texcoord.size() > 0)
-                        mesh->texcoord.resize(mesh->vertex.size());
-                    // just for sanity's sake:
-                    if (mesh->normal.size() > 0)
-                        mesh->normal.resize(mesh->vertex.size());
-
                     for (auto idx : mesh->index) {
                         if (idx.x < 0 || idx.x >= (int)mesh->vertex.size() ||
                             idx.y < 0 || idx.y >= (int)mesh->vertex.size() ||
-                            idx.z < 0 || idx.z >= (int)mesh->vertex.size())
+                            idx.z < 0 || idx.z >= (int)mesh->vertex.size()) {
+                            std::cout << ("invalid triangle indices");
                             throw std::runtime_error("invalid triangle indices");
+                        }
                     }
+
                     model->meshes.push_back(mesh);
                 }
             }
@@ -221,6 +240,8 @@ namespace osc {
             for (auto vtx : mesh->vertex)
                 model->bounds.extend(vtx);
 
+        std::cout << "created a total of " << model->meshes.size() << " meshes" << std::endl;
         return model;
     }
+
 }

@@ -19,10 +19,13 @@
 
 // public owl node-graph API
 // viewer base class, for window and user interaction
+
+#include <string>
+
 #include <owl/owl.h>
-#include <owlViewer/OWLViewer.h>
 #include <owl/common/math/vec.h>
 #include <owl/common/math/random.h>
+#include <owlViewer/OWLViewer.h>
 
 // our device-side data structures
 #include <deviceCode.cuh>
@@ -53,56 +56,54 @@ const float init_cosFovy = 0.66f;
 
 struct Viewer : public owl::viewer::OWLViewer
 {
-    int accumId = 0;
-    Scene current_scene;
-
-    RendererType renderer_type;
-    bool sbtDirty = true;
-
-    OWLRayGen rayGen{ 0 };
-    OWLMissProg missProg{ 0 };
-
-    // Buffers
-    OWLBuffer accumBuffer{ 0 };
-    OWLBuffer UBuffer{ 0 };
-    OWLBuffer SBuffer{ 0 };
-
-    OWLGroup world; // TLAS Top level accelration structure
-
-    OWLContext context{ 0 };
-    OWLModule module{ 0 };
-
-    OWLParams launch_params;
-
-    std::vector<SceneCamera> recorded_cameras;
-
-    std::vector<TriLight> tri_light_list;
-    std::vector<MeshLight> mesh_light_list;
-
-    float lerp = 0.5f;
-
-    Viewer(Scene& scene, owl::common::vec2i resolution, bool interactive, bool vsync);
-
-    int imgui_init(bool _callbacks);
-
-    void setRendererType(RendererType type);
-
+    Viewer(Scene& scene, owl::common::vec2i resolution, RendererType renderer_type, bool interactive, bool vsync);
 
     /*! gets called whenever the viewer needs us to re-render out widget */
     void render() override;
     void drawUI();
 
-    /*! window notifies us that we got resized. We HAVE to override
-        this to know our actual render dimensions, and get pointer
-        to the device frame buffer that the viewer cated for us */
+    // /*! window notifies us that we got resized. We HAVE to override
+    //     this to know our actual render dimensions, and get pointer
+    //     to the device frame buffer that the viewer cated for us */
     void resize(const owl::common::vec2i& newSize) override;
 
-    /*! this function gets called whenever any camera manipulator
-      updates the camera. gets called AFTER all values have been updated */
+    int imgui_init(bool _callbacks, const char* gl_version);
+
+    std::string gl_version;
+    // /*! this function gets called whenever any camera manipulator
+    //   updates the camera. gets called AFTER all values have been updated */
     void cameraChanged() override;
+
+    void customKey(char key, const owl::common::vec2i& pos);
+    void setRendererType(RendererType type);
+
+    RendererType rendererType;
+    bool sbtDirty = true;
+
+    OWLBuffer accumBuffer{ 0 };
+    int accumId = 0;
+
+    OWLRayGen rayGen{ 0 };
+    OWLMissProg missProg{ 0 };
+
+    OWLGroup world; // TLAS
+
+    OWLContext context{ 0 };
+    OWLModule module{ 0 };
+
+    OWLParams launchParams;
+
+    Scene currentScene;
+    std::vector<SceneCamera> recordedCameras;
+
+    std::vector<TriLight> triLightList;
+    std::vector<MeshLight> meshLightList;
+
+    // Random controls
+    float lerp = 0.5f;
 };
 
-int Viewer::imgui_init(bool _callbacks)
+int Viewer::imgui_init(bool _callbacks, const char* gl_version)
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -110,52 +111,46 @@ int Viewer::imgui_init(bool _callbacks)
 
     ImGui::StyleColorsDark();
 
-    ImGui_ImplGlfw_InitForOpenGL(this->handle, true);
-    ImGui_ImplOpenGL3_Init();
-    return ImGui_ImplOpenGL3_Init();
+    ImGui_ImplGlfw_InitForOpenGL(this->handle, _callbacks);
+    return ImGui_ImplOpenGL3_Init(gl_version);
 }
 
-Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = true, bool vsync = false)
+Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType renderer_type, bool interactive = true, bool vsync = false)
     : owl::viewer::OWLViewer("Optix Viewer", resolution, interactive, vsync)
 {
 
-    this->current_scene = scene;
-    if (!this->imgui_init(true))
-        LOG("IMGUI Init Failed")
+    this->currentScene = scene;
+    this->rendererType = renderer_type;
 
-        // create a context on the first device:
-        this->context = owlContextCreate(nullptr, 1);
-    OWLModule module = owlModuleCreate(this->context, deviceCode_ptx);
-
-    this->accumBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    this->SBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    this->UBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->accumBuffer,
-        this->getWindowSize().x * this->getWindowSize().y);
-    owlBufferResize(this->SBuffer, this->getWindowSize().x * this->getWindowSize().y);
-    owlBufferResize(this->UBuffer, this->getWindowSize().x * this->getWindowSize().y);
-
-    // Is it type of rays
-    owlContextSetRayTypeCount(this->context, 2);
-
-    /*
-          LIGHT Geometry reader
-    */
-
-    Model* tri_lights = scene.tri_lights;
-
-    int total_triangles;
-
-    for (auto light : tri_lights->meshes)
+    this->gl_version = "4.5";
+    if (!this->imgui_init(true, this->gl_version.c_str()))
     {
+        LOG("IMGUI Init Failed")
+    }
+
+    // Context & Module creation, accumulation buffer initialize
+    context = owlContextCreate(nullptr, 1);
+    module = owlModuleCreate(context, deviceCode_ptx);
+
+    accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(accumBuffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    owlContextSetRayTypeCount(context, 2);
+
+    // ====================================================
+    // Area lights setup (Assume triangular area lights)
+    // ====================================================
+
+    Model* triLights = scene.triLights;
+
+    for (auto light : triLights->meshes) {
         MeshLight meshLight;
         meshLight.flux = 0.f;
-        meshLight.triIdx = this->tri_light_list.size();
+        meshLight.triIdx = this->triLightList.size();
 
-        int num_tris = 0;
-
-        for (auto index : light->index)
-        {
+        int numTri = 0;
+        for (auto index : light->index) {
+            // First, setup data foran individual triangle light source
             TriLight triLight;
 
             triLight.v1 = light->vertex[index.x];
@@ -167,33 +162,30 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
             triLight.area = 0.5f * length(cross(triLight.v1 - triLight.v2, triLight.v3 - triLight.v2));
 
             triLight.emit = light->emit;
-            triLight.flux = 3.1415926f * triLight.area * (triLight.emit.x + triLight.emit.y + triLight.emit.z) / 3.f;
 
-            meshLight.flux += triLight.flux;
+            this->triLightList.push_back(triLight); // append to a global list of all triangle light sources
 
-            num_tris++;
+            // Keep track of number of triangles in the current light mesh
+            numTri++;
         }
 
-        total_triangles += num_tris;
+        meshLight.triCount = numTri;
+        this->meshLightList.push_back(meshLight);
 
-        meshLight.triCount = num_tris;
-
-        mesh_light_list.push_back(meshLight);
-
-        std::cout << std::endl
-            << "**************" << std::endl;
     }
 
+    // ====================================================
+    // Launch Parameters setup
+    // ====================================================
     OWLVarDecl launchParamsDecl[] = {
+        // The actual light triangles
         {"triLights", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, triLights)},
         {"numTriLights", OWL_INT, OWL_OFFSETOF(LaunchParams, numTriLights)},
-        // Light edges
+        // The mesh lights
         {"meshLights", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, meshLights)},
         {"numMeshLights", OWL_INT, OWL_OFFSETOF(LaunchParams, numMeshLights)},
         // All other parameters
         {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
-        {"UBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, UBuffer)},
-        {"SBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, SBuffer)},
         {"accumId", OWL_INT, OWL_OFFSETOF(LaunchParams, accumId)},
         {"rendererType", OWL_INT, OWL_OFFSETOF(LaunchParams, rendererType)},
         {"world", OWL_GROUP, OWL_OFFSETOF(LaunchParams, world)},
@@ -206,54 +198,55 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
         {"camera.dir_dv", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, camera.dir_dv)},
         // Random controls
         {"lerp", OWL_FLOAT, OWL_OFFSETOF(LaunchParams, lerp)},
-        {nullptr} };
-    this->launch_params = owlParamsCreate(this->context,
-        sizeof(LaunchParams),
-        launchParamsDecl, -1);
+        {nullptr}
+    };
+
+    this->launchParams = owlParamsCreate(context, sizeof(LaunchParams), launchParamsDecl, -1);
 
     // Random controls
-    owlParamsSet1f(this->launch_params, "lerp", this->lerp);
+    owlParamsSet1f(this->launchParams, "lerp", this->lerp);
 
     // Set LTC matrices (8x8, since only isotropic)
-    OWLTexture ltc1 = owlTexture2DCreate(this->context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_1,
+    OWLTexture ltc1 = owlTexture2DCreate(context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_1,
         OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
-    OWLTexture ltc2 = owlTexture2DCreate(this->context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_2,
+    OWLTexture ltc2 = owlTexture2DCreate(context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_2,
         OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
-    OWLTexture ltc3 = owlTexture2DCreate(this->context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_3,
+    OWLTexture ltc3 = owlTexture2DCreate(context, OWL_TEXEL_FORMAT_RGBA32F, 8, 8, ltc_iso_3,
         OWL_TEXTURE_LINEAR, OWL_TEXTURE_CLAMP);
 
-    owlParamsSet1i(this->launch_params, "rendererType", (int)this->renderer_type);
+    owlParamsSetTexture(this->launchParams, "ltc_1", ltc1);
+    owlParamsSetTexture(this->launchParams, "ltc_2", ltc2);
+    owlParamsSetTexture(this->launchParams, "ltc_3", ltc3);
+
+    owlParamsSet1i(this->launchParams, "rendererType", this->rendererType);
 
     // Upload the <actual> triangle data for all area lights
-    OWLBuffer triLightsBuffer = owlDeviceBufferCreate(context, OWL_USER_TYPE(TriLight), this->tri_light_list.size(), this->tri_light_list.data());
-    owlParamsSetBuffer(this->launch_params, "triLights", triLightsBuffer);
-    owlParamsSet1i(this->launch_params, "numTriLights", this->tri_light_list.size());
+    OWLBuffer triLightsBuffer = owlDeviceBufferCreate(context, OWL_USER_TYPE(TriLight), triLightList.size(), triLightList.data());
+    owlParamsSetBuffer(this->launchParams, "triLights", triLightsBuffer);
+    owlParamsSet1i(this->launchParams, "numTriLights", this->triLightList.size());
 
     // Upload the mesh data for all area lights
-    OWLBuffer meshLightsBuffer = owlDeviceBufferCreate(context, OWL_USER_TYPE(MeshLight), this->mesh_light_list.size(), this->mesh_light_list.data());
-    owlParamsSetBuffer(this->launch_params, "meshLights", meshLightsBuffer);
-    owlParamsSet1i(this->launch_params, "numMeshLights", this->mesh_light_list.size());
+    OWLBuffer meshLightsBuffer = owlDeviceBufferCreate(context, OWL_USER_TYPE(MeshLight), meshLightList.size(), meshLightList.data());
+    owlParamsSetBuffer(this->launchParams, "meshLights", meshLightsBuffer);
+    owlParamsSet1i(this->launchParams, "numMeshLights", this->meshLightList.size());
 
     // Upload accumulation buffer and ID
-    owlParamsSet1i(this->launch_params, "accumId", this->accumId);
-    owlParamsSetBuffer(this->launch_params, "accumBuffer", this->accumBuffer);
-    owlParamsSetBuffer(this->launch_params, "UBuffer", this->UBuffer);
-    owlParamsSetBuffer(this->launch_params, "SBuffer", this->SBuffer);
+    owlParamsSet1i(this->launchParams, "accumId", this->accumId);
+    owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
 
-    /*
-    BLAS LIST
-    */
+    // ====================================================
+    // Scene setup (scene geometry and materials)
+    // ====================================================
 
+    // Instance level accel. struct (IAS), built over geometry accel. struct (GAS) of each individual mesh
     std::vector<OWLGroup> blasList;
 
-    // Loop over meshes set up and Instance Accel. Structure and Geometry Accel. Structure
-
+    // Loop over meshes, set up data and build a GAS on it. Add it to IAS.
     Model* model = scene.model;
-    for (auto mesh : model->meshes)
-    {
+    for (auto mesh : model->meshes) {
 
         // ====================================================
-        // Initial setup
+        // Initial setup 
         // ====================================================
 
         // TriangleMeshData is a CUDA struct. This declares variables to be set on the host (var names given as 1st entry)
@@ -274,9 +267,10 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
             {"alpha_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, alpha_texture)},
             {"hasAlphaTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, hasAlphaTexture)},
 
-            {nullptr} };
+            {nullptr}
+        };
 
-        // This defines the geometry type of the variables defined above.
+        // This defines the geometry type of the variables defined above. 
         OWLGeomType triangleGeomType = owlGeomTypeCreate(context,
             /* Geometry type, in this case, a triangle mesh */
             OWL_GEOM_TRIANGLES,
@@ -299,18 +293,17 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
         // ====================================================
 
         // Create CUDA buffers from mesh vertices, indices and UV coordinates
-        OWLBuffer vertexBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT3, mesh->vertex.size(), mesh->vertex.data());
-        OWLBuffer normalBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT3, mesh->normal.size(), mesh->normal.data());
-        OWLBuffer indexBuffer = owlDeviceBufferCreate(this->context, OWL_INT3, mesh->index.size(), mesh->index.data());
-        OWLBuffer texCoordBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT2, mesh->texcoord.size(), mesh->texcoord.data());
+        OWLBuffer vertexBuffer = owlDeviceBufferCreate(context, OWL_FLOAT3, mesh->vertex.size(), mesh->vertex.data());
+        OWLBuffer normalBuffer = owlDeviceBufferCreate(context, OWL_FLOAT3, mesh->normal.size(), mesh->normal.data());
+        OWLBuffer indexBuffer = owlDeviceBufferCreate(context, OWL_INT3, mesh->index.size(), mesh->index.data());
+        OWLBuffer texCoordBuffer = owlDeviceBufferCreate(context, OWL_FLOAT2, mesh->texcoord.size(), mesh->texcoord.data());
 
         // Set emission value, and more importantly, if the current mesh is a light
         owlGeomSet1b(triangleGeom, "isLight", mesh->isLight);
         owlGeomSet3f(triangleGeom, "emit", owl3f{ mesh->emit.x, mesh->emit.y, mesh->emit.z });
 
         // Create CUDA buffers and upload them for diffuse and alpha textures
-        if (mesh->diffuseTextureID != -1)
-        {
+        if (mesh->diffuseTextureID != -1) {
             Texture* diffuseTexture = model->textures[mesh->diffuseTextureID];
             OWLTexture diffuseTextureBuffer = owlTexture2DCreate(context,
                 OWL_TEXEL_FORMAT_RGBA8,
@@ -322,14 +315,12 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
             owlGeomSetTexture(triangleGeom, "diffuse_texture", diffuseTextureBuffer);
             owlGeomSet1b(triangleGeom, "hasDiffuseTexture", true);
         }
-        else
-        {
+        else {
             owlGeomSet3f(triangleGeom, "diffuse", owl3f{ mesh->diffuse.x, mesh->diffuse.y, mesh->diffuse.z });
             owlGeomSet1b(triangleGeom, "hasDiffuseTexture", false);
         }
 
-        if (mesh->alphaTextureID != -1)
-        {
+        if (mesh->alphaTextureID != -1) {
             Texture* alphaTexture = model->textures[mesh->alphaTextureID];
             OWLTexture alphaTextureBuffer = owlTexture2DCreate(context,
                 OWL_TEXEL_FORMAT_RGBA8,
@@ -341,8 +332,7 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
             owlGeomSetTexture(triangleGeom, "alpha_texture", alphaTextureBuffer);
             owlGeomSet1b(triangleGeom, "hasAlphaTexture", true);
         }
-        else
-        {
+        else {
             owlGeomSet1f(triangleGeom, "alpha", mesh->alpha);
             owlGeomSet1b(triangleGeom, "hasAlphaTexture", false);
         }
@@ -383,7 +373,8 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
     // ====================================================
     OWLVarDecl missProgVars[] = {
         {"const_color", OWL_FLOAT3, OWL_OFFSETOF(MissProgData, const_color)},
-        {nullptr} };
+        {nullptr}
+    };
 
     missProg = owlMissProgCreate(context, module, "miss", sizeof(MissProgData), missProgVars, -1);
 
@@ -396,18 +387,19 @@ Viewer::Viewer(Scene &scene, owl::common::vec2i resolution, bool interactive = t
     OWLVarDecl rayGenVars[] = {
         {"frameBuffer", OWL_RAW_POINTER, OWL_OFFSETOF(RayGenData, frameBuffer)},
         {"frameBufferSize", OWL_INT2, OWL_OFFSETOF(RayGenData, frameBufferSize)},
-        {nullptr} };
+        {nullptr}
+    };
 
     rayGen = owlRayGenCreate(context, module, "rayGen", sizeof(RayGenData), rayGenVars, -1);
     // Set the TLAS to be used
-    owlParamsSetGroup(this->launch_params, "world", world);
+    owlParamsSetGroup(this->launchParams, "world", world);
 
     // ====================================================
     // Finally, build the programs, pipeline and SBT
     // ====================================================
-    owlBuildPrograms(this->context);
-    owlBuildPipeline(this->context);
-    owlBuildSBT(this->context);
+    owlBuildPrograms(context);
+    owlBuildPipeline(context);
+    owlBuildSBT(context);
 }
 
 void Viewer::render()
@@ -417,12 +409,12 @@ void Viewer::render()
         owlBuildSBT(context);
         sbtDirty = false;
     }
-    if (CHECK_IF_LTC(this->renderer_type) && accumId >= 2)
+    if (CHECK_IF_LTC(this->rendererType) && accumId >= 2)
         ;
     else
     {
-        owlParamsSet1i(this->launch_params, "accumId", this->accumId);
-        owlLaunch2D(rayGen, this->fbSize.x, this->fbSize.y, this->launch_params);
+        owlParamsSet1i(this->launchParams, "accumId", this->accumId);
+        owlLaunch2D(rayGen, this->fbSize.x, this->fbSize.y, this->launchParams);
         accumId++;
     }
 }
@@ -435,13 +427,7 @@ void Viewer::resize(const owl::common::vec2i& newSize)
 
     // Resize accumulation buffer, and set to launch params
     owlBufferResize(this->accumBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launch_params, "accumBuffer", this->accumBuffer);
-
-    owlBufferResize(this->UBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launch_params, "UBuffer", this->UBuffer);
-
-    owlBufferResize(this->SBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launch_params, "SBuffer", this->UBuffer);
+    owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
 
     // Perform camera move i.e. set new camera parameters, and set SBT to be updated
     this->cameraChanged();
@@ -449,17 +435,21 @@ void Viewer::resize(const owl::common::vec2i& newSize)
 
 void Viewer::setRendererType(RendererType type)
 {
-    this->renderer_type = type;
-    owlParamsSet1i(this->launch_params, "rendererType", (int)this->renderer_type);
+    this->rendererType = type;
+    owlParamsSet1i(this->launchParams, "rendererType", (int)this->rendererType);
 }
 
 /*! window notifies us that the camera has changed */
 void Viewer::cameraChanged()
 {
+    // Reset accumulation buffer, to restart MC sampling
+    this->accumId = 0;
+
     const owl::common::vec3f lookFrom = camera.getFrom();
     const owl::common::vec3f lookAt = camera.getAt();
     const owl::common::vec3f lookUp = camera.getUp();
     const float cosFovy = camera.getCosFovy();
+
     // ----------- compute variable values  ------------------
     owl::common::vec3f camera_pos = lookFrom;
     owl::common::vec3f camera_d00 = normalize(lookAt - lookFrom);
@@ -470,14 +460,15 @@ void Viewer::cameraChanged()
     camera_d00 -= 0.5f * camera_ddv;
 
     // ----------- set variables  ----------------------------
-    owlRayGenSet1ul(rayGen, "fbPtr", (uint64_t)fbPointer);
-    // owlRayGenSetBuffer(rayGen,"fbPtr",        frameBuffer);
-    owlRayGenSet2i(rayGen, "fbSize", (const owl2i&)fbSize);
-    owlRayGenSet3f(rayGen, "camera.pos", (const owl3f&)camera_pos);
-    owlRayGenSet3f(rayGen, "camera.dir_00", (const owl3f&)camera_d00);
-    owlRayGenSet3f(rayGen, "camera.dir_du", (const owl3f&)camera_ddu);
-    owlRayGenSet3f(rayGen, "camera.dir_dv", (const owl3f&)camera_ddv);
-    sbtDirty = true;
+    owlRayGenSet1ul(rayGen, "frameBuffer", (uint64_t)this->fbPointer);
+    owlRayGenSet2i(rayGen, "frameBufferSize", (const owl2i&)this->fbSize);
+
+    owlParamsSet3f(this->launchParams, "camera.pos", (const owl3f&)camera_pos);
+    owlParamsSet3f(this->launchParams, "camera.dir_00", (const owl3f&)camera_d00);
+    owlParamsSet3f(this->launchParams, "camera.dir_du", (const owl3f&)camera_ddu);
+    owlParamsSet3f(this->launchParams, "camera.dir_dv", (const owl3f&)camera_ddv);
+
+    this->sbtDirty = true;
 }
 
 void Viewer::drawUI()
@@ -490,12 +481,12 @@ void Viewer::drawUI()
         ImGui::Begin("Controls", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
         ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-        int currentType = this->renderer_type;
+        int currentType = this->rendererType;
         ImGui::Combo("Renderer", &currentType, rendererNames, NUM_RENDERER_TYPES, 0);
-        if (currentType != this->renderer_type)
+        if (currentType != this->rendererType)
         {
-            this->renderer_type = static_cast<RendererType>(currentType);
-            owlParamsSet1i(this->launch_params, "rendererType", currentType);
+            this->rendererType = static_cast<RendererType>(currentType);
+            owlParamsSet1i(this->launchParams, "rendererType", currentType);
             this->cameraChanged();
         }
 
@@ -504,7 +495,7 @@ void Viewer::drawUI()
         if (currentLerp != this->lerp)
         {
             this->lerp = currentLerp;
-            owlParamsSet1f(this->launch_params, "lerp", this->lerp);
+            owlParamsSet1f(this->launchParams, "lerp", this->lerp);
             this->cameraChanged();
         }
 
@@ -513,4 +504,44 @@ void Viewer::drawUI()
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void Viewer::customKey(char key, const owl::common::vec2i& pos)
+{
+    if (key == '1' || key == '!') {
+        this->camera.setOrientation(this->camera.getFrom(), owl::common::vec3f(0.f), owl::common::vec3f(0.f, 0.f, 1.f), this->camera.getFovyInDegrees());
+        this->cameraChanged();
+    }
+    else if (key == 'R' || key == 'r') {
+        SceneCamera cam;
+        cam.from = this->camera.getFrom();
+        cam.at = this->camera.getAt();
+        cam.up = this->camera.getUp();
+        cam.cosFovy = this->camera.getCosFovy();
+
+        this->recordedCameras.push_back(cam);
+    }
+    else if (key == 'F' || key == 'f') {
+        nlohmann::json camerasJson;
+
+        for (auto cam : this->recordedCameras) {
+            nlohmann::json oneCameraJson;
+            std::vector<float> from, at, up;
+
+            for (int i = 0; i < 3; i++) {
+                from.push_back(cam.from[i]);
+                at.push_back(cam.at[i]);
+                up.push_back(cam.up[i]);
+            }
+
+            oneCameraJson["from"] = from;
+            oneCameraJson["to"] = at;
+            oneCameraJson["up"] = up;
+            oneCameraJson["cos_fovy"] = cam.cosFovy;
+
+            camerasJson.push_back(oneCameraJson);
+        }
+
+        this->currentScene.json["cameras"] = camerasJson;
+    }
 }

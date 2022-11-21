@@ -4,7 +4,7 @@
 
 void Scene::syncLights()
 {
-    for (auto light : this->tri_lights->meshes)
+    for (auto light : this->triLights->meshes)
     {
         light->isLight = true;
         this->model->meshes.push_back(light);
@@ -87,7 +87,7 @@ bool parseScene(std::string sceneFile, Scene& scene)
     // Load .obj file of area lights
     try
     {
-        scene.tri_lights = loadOBJ(sceneConfig["area_lights"]);
+        scene.triLights = loadOBJ(sceneConfig["area_lights"]);
         scene.syncLights();
     }
     catch (nlohmann::json::exception e)
