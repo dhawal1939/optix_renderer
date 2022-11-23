@@ -21,6 +21,7 @@
 // viewer base class, for window and user interaction
 
 #include <string>
+#include <fstream>
 
 #include <owl/owl.h>
 #include <owl/common/math/vec.h>
@@ -54,7 +55,7 @@ const owl::common::vec3f init_lookAt(0.f, 0.f, 0.f);
 const owl::common::vec3f init_lookUp(0.f, 1.f, 0.f);
 const float init_cosFovy = 0.66f;
 
-struct Viewer : public owl::viewer::OWLViewer
+struct Viewer :public owl::viewer::OWLViewer
 {
     Viewer(Scene& scene, owl::common::vec2i resolution, RendererType renderer_type, bool interactive, bool vsync);
 
@@ -66,15 +67,20 @@ struct Viewer : public owl::viewer::OWLViewer
     //     this to know our actual render dimensions, and get pointer
     //     to the device frame buffer that the viewer cated for us */
     void resize(const owl::common::vec2i& newSize) override;
+    void save_full(const std::string& fileName);
 
     int imgui_init(bool _callbacks, const char* gl_version);
 
     std::string gl_version;
+
+    std::string to_save_file;
     // /*! this function gets called whenever any camera manipulator
     //   updates the camera. gets called AFTER all values have been updated */
     void cameraChanged() override;
 
-    void customKey(char key, const owl::common::vec2i& pos);
+    void key(char key, const owl::common::vec2i& pos) override;
+    void mouseButtonLeft(const owl::common::vec2i & where, bool pressed) override;
+
     void setRendererType(RendererType type);
 
     RendererType rendererType;
@@ -506,7 +512,47 @@ void Viewer::drawUI()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void Viewer::customKey(char key, const owl::common::vec2i& pos)
+
+void Viewer::save_full(const std::string& fileName)
+{
+    const uint32_t* fb
+        = (const uint32_t*)fbPointer;
+
+    std::vector<uint32_t> pixels;
+    for (int y = 0; y < fbSize.y; y++) {
+        const uint32_t* line = fb + (fbSize.y - 1 - y) * fbSize.x;
+        for (int x = 0; x < fbSize.x; x++) {
+            pixels.push_back(line[x] | (0xff << 24));
+        }
+    }
+    printf("%d Pixels\n", pixels.size());
+
+    std::fstream _file;
+    _file.open("vector_file_2.txt", std::ios_base::out);
+
+    std::vector<std::uint32_t>::iterator itr;
+
+    for (itr = pixels.begin(); itr != pixels.end(); itr++)
+    {
+        _file << *itr << std::endl;
+    }
+
+    _file.close();
+
+    std::cout << "#owl.viewer: frame buffer written to " << fileName << std::endl;
+}
+
+void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
+{
+    if (pressed == true) {
+        //owlParamsSet1b(this->launchParams, "clicked", true);
+        //owlParamsSet2i(this->launchParams, "pixelId", (const owl2i&)where);
+        this->screenShot(this->to_save_file);
+        //this->save_full(this->to_save_file);
+    }
+}
+
+void Viewer::key(char key, const owl::common::vec2i& pos)
 {
     if (key == '1' || key == '!') {
         this->camera.setOrientation(this->camera.getFrom(), owl::common::vec3f(0.f), owl::common::vec3f(0.f, 0.f, 1.f), this->camera.getFovyInDegrees());
@@ -543,5 +589,10 @@ void Viewer::customKey(char key, const owl::common::vec2i& pos)
         }
 
         this->currentScene.json["cameras"] = camerasJson;
+    }
+
+    else if (key == 'P') {
+        printf("Keypress");
+        this->screenShot(this->to_save_file);
     }
 }

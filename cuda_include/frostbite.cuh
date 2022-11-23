@@ -31,6 +31,13 @@ float D(float alpha, owl::common::vec3f H) {
 }
 
 __device__
+float schlickSingleMask(float NdotV, float roughness)
+{
+    float k = roughness * roughness / 2.0;
+    return NdotV / (NdotV * (1.0 - k) + k);
+}
+
+__device__
 float GGX(float alpha, owl::common::vec3f V, owl::common::vec3f L) {
     owl::common::vec3f H = normalize(V + L);
     float value = D(alpha, H) * G2(alpha, V, L) / 4.0f / V.z / L.z;

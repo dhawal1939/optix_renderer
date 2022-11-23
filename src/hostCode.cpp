@@ -7,7 +7,6 @@
 
 int main(int argc, char** argv)
 {
-    std::string savePath;
     bool isInteractive = true;
 
     std::string currentScene;
@@ -33,7 +32,11 @@ int main(int argc, char** argv)
     }
 
     owl::common::vec2i resolution(scene.imgWidth, scene.imgHeight);
-    Viewer win(scene, resolution, LTC_BASELINE);
+    printf("%d %d reso\n", resolution.x, resolution.y);
+    std::string savePath = "C:/Users/dhawals/repos/optix_renderer/normal.png";
+    Viewer win(scene, resolution, NORMALS);
+
+    win.to_save_file = savePath;
 
     if (isInteractive)
     {
@@ -49,6 +52,8 @@ int main(int argc, char** argv)
         // now that everything is ready: launch it ....
         // ##################################################################
         win.showAndRun();
+
+
     }
 
     return 0;

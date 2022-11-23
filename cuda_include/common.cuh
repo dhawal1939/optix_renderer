@@ -18,11 +18,13 @@ enum RendererType {
 	DIFFUSE = 0,
 	ALPHA = 1,
 	NORMALS = 2,
+	POSITION,
 	DIRECT_LIGHT_LSAMPLE,
 	DIRECT_LIGHT_BRDFSAMPLE,
 	DIRECT_LIGHT_MIS,
 	LTC_BASELINE,
 	RATIO,
+	PATH,
 	NUM_RENDERER_TYPES
 };
 
@@ -30,11 +32,13 @@ const char* rendererNames[NUM_RENDERER_TYPES] = {
 													"Diffuse",
 													"Alpha",
 													"Normals",
+													"Position",
 													"Direct Light (Light)",
 													"Direct Light (BRDF)",
 													"Direct Light (MIS)",
 													"LTC Baseline",
-													"RATIO"
+													"RATIO",
+													"PATH"
 };
 
 __inline__ __host__
@@ -74,6 +78,9 @@ struct MeshLight {
 };
 
 struct LaunchParams {
+	//bool clicked;
+	//owl::common::vec2i pixelId;
+
 	float4* accumBuffer;
 	int accumId;
 
