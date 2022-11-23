@@ -686,6 +686,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         color = si.diffuse;
         color = si.n_geom;
     }
+    else if (optixLaunchParams.rendererType == MASK)
+        color = owl::common::vec3f(1., 1., 1.);
     else if (optixLaunchParams.rendererType == POSITION)
         color = si.p;
     else if (optixLaunchParams.rendererType == DIFFUSE)

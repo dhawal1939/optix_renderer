@@ -33,8 +33,8 @@ int main(int argc, char** argv)
 
     owl::common::vec2i resolution(scene.imgWidth, scene.imgHeight);
     printf("%d %d reso\n", resolution.x, resolution.y);
-    std::string savePath = "C:/Users/dhawals/repos/optix_renderer/normal.png";
-    Viewer win(scene, resolution, NORMALS);
+    std::string savePath = "C:/Users/dhawals/repos/optix_renderer/mask.png";
+    Viewer win(scene, resolution, MASK);
 
     win.to_save_file = savePath;
 
