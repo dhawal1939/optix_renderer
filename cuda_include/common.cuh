@@ -18,6 +18,7 @@ enum RendererType {
 	DIFFUSE = 0,
 	ALPHA = 1,
 	NORMALS = 2,
+	SHADE_NORMALS,
 	POSITION,
 	MASK,
 	DIRECT_LIGHT_LSAMPLE,
@@ -33,6 +34,7 @@ const char* rendererNames[NUM_RENDERER_TYPES] = {
 													"Diffuse",
 													"Alpha",
 													"Normals",
+													"Shading Normals"
 													"Position",
 													"MASK",
 													"Direct Light (Light)",
@@ -80,8 +82,8 @@ struct MeshLight {
 };
 
 struct LaunchParams {
-	//bool clicked;
-	//owl::common::vec2i pixelId;
+	bool clicked;
+	owl::common::vec2i pixelId;
 
 	float4* accumBuffer;
 	int accumId;
@@ -129,6 +131,10 @@ struct TriangleMeshData {
 	float alpha;
 	bool hasAlphaTexture;
 	cudaTextureObject_t alpha_texture;
+
+	float normal_map;
+	bool hasNormalTexture;
+	cudaTextureObject_t normal_texture;
 };
 
 struct MissProgData {

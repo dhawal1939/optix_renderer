@@ -10,7 +10,7 @@ int main(int argc, char** argv)
     bool isInteractive = true;
 
     std::string currentScene;
-    std::string defaultScene = "C:/Users/dhawals/repos/optix_renderer/scenes/scene_configs/bistro.json";
+    std::string defaultScene = "C:/Users/dhawals/repos/optix_renderer/scenes/scene_configs/test_scene.json";
 
     /*if (argc == 2)
         currentScene = std::string(argv[1]);

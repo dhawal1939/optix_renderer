@@ -213,6 +213,12 @@ namespace osc {
                         materials[materialID].specular_texname,
                         modelDir);
 
+
+                    mesh->normalTextureID = loadTexture(model,
+                        knownTextures,
+                        materials[materialID].bump_texname,
+                        modelDir);
+
                     mesh->emit = (const owl::common::vec3f&)materials[materialID].diffuse;
                 }
 

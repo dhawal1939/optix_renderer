@@ -53,38 +53,39 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
     SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
     si.hit = true;
 
+    // area of triangle
+    owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
+    owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
+    owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
+    si.area = 0.5f * length(cross(v1 - v2, v3 - v2));
+
     // Exact hit point on the triangle
     si.p = barycentricInterpolate(self.vertex, primitiveIndices);
-
-    // Out going direction pointing toward the pixel location
-    si.wo = owl::normalize(optixLaunchParams.camera.pos - si.p);
 
     // UV coordinate of the hit point
     si.uv = barycentricInterpolate(self.texCoord, primitiveIndices);
     si.uv.x = owl::common::abs(fmodf(si.uv.x, 1.));
     si.uv.y = owl::common::abs(fmodf(si.uv.y, 1.));
 
+
+    si.emit = self.emit;
+    si.isLight = self.isLight;
     // geometric normal 
     si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-
-    // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
-    orthonormalBasis(si.n_geom, si.to_local, si.to_world);
-
-    // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
-    si.wo_local = normalize(apply_mat(si.to_local, si.wo));
-
-    // area of triangle
-
-    owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
-    owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
-    owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
-    si.area = 0.5f * length(cross(v1 - v2, v3 - v2));
-
+    // if bump map exists
+    if (self.hasNormalTexture)
+    {
+       float4 normal_vals= tex2D<float4>(self.normal_texture, si.uv.x, si.uv.y);
+       si.n_shad = owl::common::vec3f(normal_vals.x, normal_vals.y, normal_vals.z);
+       si.n_shad = owl::normalize(si.n_shad);
+    }
     // axix independet prop
     si.diffuse = self.diffuse;
     if (self.hasDiffuseTexture)
-        si.diffuse = (owl::common::vec3f)tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
-
+    {
+        float4 diffuse_values = tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
+        si.diffuse = owl::common::vec3f(diffuse_values.x, diffuse_values.y, diffuse_values.z);
+    }
     si.alpha = self.alpha;
     if (self.hasAlphaTexture)
     {
@@ -93,10 +94,6 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
         //si.alpha = owl::common::length(owl::common::vec3f(alpha_values.x, alpha_values.y, alpha_values.z));
     }
     si.alpha = clamp(si.alpha, 0.01f, 1.f);
-
-    si.emit = self.emit;
-    si.isLight = self.isLight;
-
 }
 
 OPTIX_MISS_PROGRAM(miss)()

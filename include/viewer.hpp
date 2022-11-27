@@ -79,7 +79,7 @@ struct Viewer :public owl::viewer::OWLViewer
     void cameraChanged() override;
 
     void key(char key, const owl::common::vec2i& pos) override;
-    void mouseButtonLeft(const owl::common::vec2i & where, bool pressed) override;
+    //void mouseButtonLeft(const owl::common::vec2i & where, bool pressed) override;
 
     void setRendererType(RendererType type);
 
@@ -272,7 +272,10 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
             {"alpha", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, alpha)},
             {"alpha_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, alpha_texture)},
             {"hasAlphaTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, hasAlphaTexture)},
-
+            
+            {"normal", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, normal_map)},
+            {"normal_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, hasNormalTexture)},
+            {"hasNormalTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, normal_texture)},
             {nullptr}
         };
 
@@ -341,6 +344,22 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         else {
             owlGeomSet1f(triangleGeom, "alpha", mesh->alpha);
             owlGeomSet1b(triangleGeom, "hasAlphaTexture", false);
+        }
+
+        if (mesh->normalTextureID != -1) {
+            Texture* normalTexture = model->textures[mesh->normalTextureID];
+            OWLTexture normalTextureBuffer = owlTexture2DCreate(context,
+                OWL_TEXEL_FORMAT_RGBA8,
+                normalTexture->resolution.x,
+                normalTexture->resolution.y,
+                normalTexture->pixel,
+                OWL_TEXTURE_NEAREST,
+                OWL_TEXTURE_CLAMP);
+            owlGeomSetTexture(triangleGeom, "normal_texture", normalTextureBuffer);
+            owlGeomSet1b(triangleGeom, "hasNormalTexture", true);
+        }
+        else {
+            owlGeomSet1b(triangleGeom, "hasNormalTexture", false);
         }
 
         // ====================================================
@@ -542,13 +561,12 @@ void Viewer::save_full(const std::string& fileName)
     std::cout << "#owl.viewer: frame buffer written to " << fileName << std::endl;
 }
 
-void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
+/*void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
 {
     if (pressed == true) {
         owlParamsSet1b(this->launchParams, "clicked", true);
         owlParamsSet2i(this->launchParams, "pixelId", (const owl2i&)where);
-    }
-}
+}*/
 
 void Viewer::key(char key, const owl::common::vec2i& pos)
 {

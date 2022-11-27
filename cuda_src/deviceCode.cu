@@ -16,7 +16,7 @@
 
 #include <hit_miss.cuh>
 
-
+__device__
 owl::common::vec3f sampleLight(int selectedLightIdx, owl::common::vec2f rand) {
 
     TriLight triLight = optixLaunchParams.triLights[selectedLightIdx];
@@ -29,6 +29,7 @@ owl::common::vec3f sampleLight(int selectedLightIdx, owl::common::vec2f rand) {
     return samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
 }
 
+__device__
 float sampleLightPdf(int selectedLightIdx) 
 { 
     // Area calucation
@@ -36,6 +37,7 @@ float sampleLightPdf(int selectedLightIdx)
     return 1 / (triLight.area * optixLaunchParams.numTriLights); 
 }
 
+__device__
 // Convert from area measure to angle measure
 float pdfA2W(float pdf, float dist2, float cos_theta) {
     float abs_cos_theta = abs(cos_theta);
@@ -131,41 +133,92 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 __device__
 owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int max_ray_depth = 4)
 {
-    for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
+    owl::common::vec3f color(0.f, 0.f, 0.f);
+    if (si.isLight)
+        color=owl::common::vec3f(1., 1., 1.);
+
+    for (int ray_depth = 0; ray_depth < 8; ray_depth++)
     {
+
         owl::common::vec2f rand1 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
         owl::common::vec2f rand2 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-
         owl::common::vec3f V = si.wo; // Global direction
-        // MIS
+        owl::common::vec3f tp(1.f, 1.f, 1.f);
+
+        //// MIS
+        //{
+        //    int selectedLightIdx = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
+        //    
+        //    float lightPdf = sampleLightPdf(selectedLightIdx);
+        //    owl::common::vec3f pos = sampleLight(selectedLightIdx, rand1);
+        //    owl::common::vec3f newPos = si.p;
+        //    owl::common::vec3f L = normalize(pos - newPos);  // incoming from light
+        //    float dist = owl::common::length(pos - newPos);
+        //    dist = dist * dist;
+
+        //    SurfaceInteraction _si;
+        //    _si
+
+        //    if (si.hit && si.isLight) {
+        //        owl::common::vec3f H = normalize(V + L);
+        //        float brdfPdf;
+        //        sampleNdfPdf(owl::common::vec3f L, owl::common::vec3f H, owl::common::vec3f N, float D)
+        //        owl::common::vec3f brdf = evalBSDF(si.alpha, si.diffuse, 
+        //                                            si.n_geom, H, V, L, newPos);
+        //        float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, si.n_geom));
+        //        float misW = lightPdfW / (lightPdfW + brdfPdf);
+        //        color += misW * si.diffuse * tp * brdf * clampDot(si.n_geom, L, true) /
+        //            lightPdfW;
+        //    }
+        //    return color;
+        //}
         {
-            int selectedLightIdx = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-            
-            float lightPdf = sampleLightPdf(selectedLightIdx);
+            RadianceRay ray;
 
-            owl::common::vec3f pos = sampleLight(selectedLightIdx, rand1);
-            owl::common::vec3f newPos = si.p;
+            owl::common::vec3f H = sampleNdf(si.alpha, rand2, si.to_world); // check if local or global
 
-            owl::common::vec3f L = normalize(pos - newPos);  // incoming from light
-            float dist = owl::common::length(pos - newPos);
-            dist = dist * dist;
+            float3 reflect_vec = reflect(make_float3(V.x, V.y, V.z), make_float3(H.x, H.y, H.z));
+            owl::common::vec3f L = owl::common::normalize(owl::common::vec3f(
+                                                            reflect_vec.x, 
+                                                            reflect_vec.y, 
+                                                            reflect_vec.z));
+            ray.origin = si.p;
+            ray.direction = L;
 
-            owl::common::vec3f tNormal;
-            if (si.hit && si.isLight) {
-                owl::common::vec3f H = normalize(V + L);
+            SurfaceInteraction _si;
+            owl::traceRay(optixLaunchParams.world, ray, _si);
 
-                float brdfPdf;
-                owl::common::vec3f brdf = evalBSDF(mat, normal, H, V, L, newPos, brdfPdf);
+            owl::common::vec3f newPos = si.p + EPS * si.n_geom;
 
-                float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, tNormal));
+            // wo calculation
+            {
+                // Out going direction pointing toward the pixel location
+                _si.wo = owl::normalize(si.p - _si.p);
+                // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
+                orthonormalBasis(_si.n_geom, _si.to_local, _si.to_world);
 
-                float misW = lightPdfW / (lightPdfW + brdfPdf);
-
-                contrib += misW * tMat.color * tp * brdf * clampDot(normal, L, true) /
-                    lightPdfW;
+                // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
+                _si.wo_local = normalize(apply_mat(_si.to_local, _si.wo));
             }
+
+            if (!_si.hit)
+                break;
+
+            float brdfPdf = sampleNdfPdf(L, H, si.n_geom, si.alpha);
+            owl::common::vec3f brdf = evalBSDF(si.alpha,
+                                               si.diffuse,
+                                               si.n_geom, H, V, L, newPos);
+            if (_si.isLight) {
+                // color from next hit _si.emit
+                color += _si.emit * tp * brdf *
+                    clampDot(si.n_geom, L, true) / brdfPdf;
+                break;
+            }
+
+            tp *= clampDot(si.n_geom, L, true) * brdf / brdfPdf;
         }
     }
+    return color;
 }
 
 
@@ -218,11 +271,21 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     RadianceRay ray;
     ray.origin = optixLaunchParams.camera.pos;
     ray.direction = normalize(optixLaunchParams.camera.dir_00
-                                + screen.u * optixLaunchParams.camera.dir_du
-                                + screen.v * optixLaunchParams.camera.dir_dv);
+        + screen.u * optixLaunchParams.camera.dir_du
+        + screen.v * optixLaunchParams.camera.dir_dv);
 
     SurfaceInteraction si;
     owl::traceRay(optixLaunchParams.world, ray, si);
+    // wo calculation
+    {
+        // Out going direction pointing toward the pixel location
+        si.wo = owl::normalize(optixLaunchParams.camera.pos - si.p);
+        // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
+        orthonormalBasis(si.n_geom, si.to_local, si.to_world);
+
+        // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
+        si.wo_local = normalize(apply_mat(si.to_local, si.wo));
+    }
 
     owl::common::vec3f color(0.f, 0.f, 0.f);
     //printf("%d\n", optixLaunchParams.rendererType);
@@ -241,6 +304,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         color = si.alpha;
     else if (optixLaunchParams.rendererType == NORMALS)
         color = si.n_geom;
+    else if (optixLaunchParams.rendererType == SHADE_NORMALS)
+        color = si.n_shad;
     // Direct lighting with LTC
     else if (optixLaunchParams.rendererType == LTC_BASELINE) {
         if (si.isLight)
@@ -274,7 +339,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     {
         int n = 1;
         for(int i=0;i<n;i++)
-           color += estimatePathTracing(si, rng);
+           color += estimatePathTracing(si, rng, 4);
         color /= n;
     }
     else {
