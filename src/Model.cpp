@@ -210,7 +210,7 @@ namespace osc {
                     mesh->alpha = (const float)materials[materialID].shininess;
                     mesh->alphaTextureID = loadTexture(model,
                         knownTextures,
-                        materials[materialID].specular_highlight_texname,
+                        materials[materialID].specular_texname,
                         modelDir);
 
                     mesh->emit = (const owl::common::vec3f&)materials[materialID].diffuse;

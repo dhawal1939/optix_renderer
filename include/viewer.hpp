@@ -289,7 +289,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
 
         // Defines the function name in .cu file, to be used for closest hit processing
         owlGeomTypeSetClosestHit(triangleGeomType, RADIANCE_RAY_TYPE, module, "triangleMeshCH");
-        owlGeomTypeSetClosestHit(triangleGeomType, SHADOW_RAY_TYPE, module, "triangleMeshCHShadow");
+        //owlGeomTypeSetClosestHit(triangleGeomType, SHADOW_RAY_TYPE, module, "triangleMeshCHShadow");
 
         // Create the actual geometry on the device
         OWLGeom triangleGeom = owlGeomCreate(context, triangleGeomType);
@@ -545,10 +545,8 @@ void Viewer::save_full(const std::string& fileName)
 void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
 {
     if (pressed == true) {
-        //owlParamsSet1b(this->launchParams, "clicked", true);
-        //owlParamsSet2i(this->launchParams, "pixelId", (const owl2i&)where);
-        this->screenShot(this->to_save_file);
-        //this->save_full(this->to_save_file);
+        owlParamsSet1b(this->launchParams, "clicked", true);
+        owlParamsSet2i(this->launchParams, "pixelId", (const owl2i&)where);
     }
 }
 

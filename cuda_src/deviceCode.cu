@@ -14,109 +14,37 @@
 // // limitations under the License.                                           //
 // // ======================================================================== //
 
-#include <utils.cuh>
-#include <common.cuh>
-#include <frostbite.cuh>
-#include <lcg_random.cuh>
-#include <optix_device.h>
-#include <owl/owl_device.h>
-#include <ltc/ltc_utils.cuh>
-#include <ltc/polygon_utils.cuh>
-
-#include <vector_types.h>
-#include <texture_fetch_functions.h>
+#include <hit_miss.cuh>
 
 
+owl::common::vec3f sampleLight(int selectedLightIdx, owl::common::vec2f rand) {
 
+    TriLight triLight = optixLaunchParams.triLights[selectedLightIdx];
+    owl::common::vec3f lv1 = triLight.v1;
+    owl::common::vec3f lv2 = triLight.v2;
+    owl::common::vec3f lv3 = triLight.v3;
+    owl::common::vec3f lnormal = triLight.normal;
+    owl::common::vec3f lemit = triLight.emit;
+    float larea = triLight.area;
+    return samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
+}
 
-OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCHShadow)()
-{
-    const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
-    const owl::common::vec3i primitiveIndices = self.index[optixGetPrimitiveIndex()];
-    ShadowRayData& srd = owl::getPRD<ShadowRayData>();
+float sampleLightPdf(int selectedLightIdx) 
+{ 
+    // Area calucation
+    TriLight triLight = optixLaunchParams.triLights[selectedLightIdx];
+    return 1 / (triLight.area * optixLaunchParams.numTriLights); 
+}
 
-    if (self.isLight) {
-        srd.visibility = owl::common::vec3f(1.f);
-        srd.point = barycentricInterpolate(self.vertex, primitiveIndices);
-        srd.normal = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-        srd.emit = self.emit;
-
-        owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
-        owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
-        owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
-        srd.area = 0.5f * length(cross(v1 - v2, v3 - v2));
-
-        srd.cg = (v1 + v2 + v3) / 3.f;
-    }
-    else {
-        srd.visibility = owl::common::vec3f(0.f);
-        srd.point = barycentricInterpolate(self.vertex, primitiveIndices);
-        srd.normal = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-        srd.emit = owl::common::vec3f(0.);
-
-        owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
-        owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
-        owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
-        srd.area = 0.5f * length(cross(v1 - v2, v3 - v2));
-
-        srd.cg = (v1 + v2 + v3) / 3.f;
+// Convert from area measure to angle measure
+float pdfA2W(float pdf, float dist2, float cos_theta) {
+    float abs_cos_theta = abs(cos_theta);
+    if (abs_cos_theta < 1e-8) {
+        return 0.0;
     }
 
+    return pdf * dist2 / abs_cos_theta;
 }
-
-OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
-{
-    const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
-    const owl::common::vec3i primitiveIndices = self.index[optixGetPrimitiveIndex()];
-
-    SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
-
-    // Exact hit point on the triangle
-    si.p = barycentricInterpolate(self.vertex, primitiveIndices);
-
-    // Out going direction pointing toward the pixel location
-    si.wo = owl::normalize(optixLaunchParams.camera.pos - si.p);
-
-    // UV coordinate of the hit point
-    si.uv = barycentricInterpolate(self.texCoord, primitiveIndices);
-    si.uv.x = owl::common::abs(fmodf(si.uv.x, 1.));
-    si.uv.y = owl::common::abs(fmodf(si.uv.y, 1.));
-
-    // geometric normal 
-    si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-
-    // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
-    orthonormalBasis(si.n_geom, si.to_local, si.to_world);
-
-    // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
-    si.wo_local = normalize(apply_mat(si.to_local, si.wo));
-
-    // axix independet prop
-    si.diffuse = self.diffuse;
-    if (self.hasDiffuseTexture)
-        si.diffuse = (owl::common::vec3f)tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
-
-    si.alpha = self.alpha;
-    if (self.hasAlphaTexture)
-        si.alpha = tex2D<float4>(self.alpha_texture, si.uv.x, si.uv.y).x;
-    si.alpha = clamp(si.alpha, 0.01f, 1.f);
-
-    si.emit = self.emit;
-    si.isLight = self.isLight;
-
-    si.hit = true;
-}
-
-OPTIX_MISS_PROGRAM(miss)()
-{
-    const owl::common::vec2i pixelId = owl::getLaunchIndex();
-    const MissProgData& self = owl::getProgramData<MissProgData>();
-
-    SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
-    si.hit = false;
-    si.diffuse = self.const_color;
-}
-
 
 __device__
 owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec3f ltc_mat[3], owl::common::vec3f ltc_mat_inv[3], float amplitude,
@@ -201,423 +129,44 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 }
 
 __device__
-owl::common::vec3f sampleLightSource(SurfaceInteraction si, int lightIdx, float lightSelectionPdf, owl::common::vec2f rand, bool mis)
+owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int max_ray_depth = 4)
 {
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    float light_pdf = 0.f, brdf_pdf = 0.f;
-    TriLight triLight = optixLaunchParams.triLights[lightIdx];
-
-    owl::common::vec3f lv1 = triLight.v1;
-    owl::common::vec3f lv2 = triLight.v2;
-    owl::common::vec3f lv3 = triLight.v3;
-    owl::common::vec3f lnormal = triLight.normal;
-    owl::common::vec3f lemit = triLight.emit;
-    float larea = triLight.area;
-
-    owl::common::vec3f lpoint = samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
-    owl::common::vec3f wi = normalize(lpoint - si.p);
-    owl::common::vec3f wi_local = normalize(apply_mat(si.to_local, wi));
-
-    float xmy = pow(owl::length(lpoint - si.p), 2.f);
-    float lDotWi = owl::abs(owl::dot(lnormal, -wi));
-
-    light_pdf = lightSelectionPdf * (xmy / (larea * lDotWi));
-
-    ShadowRay ray;
-    ray.origin = si.p + 1e-3f * si.n_geom;
-    ray.direction = wi;
-
-    ShadowRayData srd;
-    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-    if (si.wo_local.z > 0.f && wi_local.z > 0.f && srd.visibility != owl::common::vec3f(0.f) && light_pdf > 0.f && owl::dot(-wi, lnormal) > 0.f) {
-        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        if (mis && brdf_pdf > 0.f) {
-            float weight = PowerHeuristic(1, light_pdf, 1, brdf_pdf);
-            color += brdf * lemit * owl::abs(wi_local.z) * weight / light_pdf;
-        }
-        else if (!mis) {
-            color += brdf * lemit * owl::abs(wi_local.z) / light_pdf;
-        }
-    }
-
-    return color;
-}
-
-__device__
-owl::common::vec3f sampleLightSourceNoNLTest(SurfaceInteraction si, int lightIdx, float lightSelectionPdf, owl::common::vec2f rand, bool mis)
-{
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    float light_pdf = 0.f, brdf_pdf = 0.f;
-    TriLight triLight = optixLaunchParams.triLights[lightIdx];
-
-    owl::common::vec3f lv1 = triLight.v1;
-    owl::common::vec3f lv2 = triLight.v2;
-    owl::common::vec3f lv3 = triLight.v3;
-    owl::common::vec3f lnormal = triLight.normal;
-    owl::common::vec3f lemit = triLight.emit;
-    float larea = triLight.area;
-
-    owl::common::vec3f lpoint = samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
-    owl::common::vec3f wi = normalize(lpoint - si.p);
-    owl::common::vec3f wi_local = normalize(apply_mat(si.to_local, wi));
-
-    float xmy = pow(owl::length(lpoint - si.p), 2.f);
-    float lDotWi = owl::abs(owl::dot(lnormal, -wi));
-
-    light_pdf = lightSelectionPdf * (xmy / (larea * lDotWi));
-
-    ShadowRay ray;
-    ray.origin = si.p + 1e-3f * si.n_geom;
-    ray.direction = wi;
-
-    ShadowRayData srd;
-    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-    if (si.wo_local.z > 0.f && wi_local.z > 0.f && srd.visibility != owl::common::vec3f(0.f) && light_pdf > 0.f) {
-        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        if (mis && brdf_pdf > 0.f) {
-            float weight = PowerHeuristic(1, light_pdf, 1, brdf_pdf);
-            color += brdf * lemit * owl::abs(wi_local.z) * weight / light_pdf;
-        }
-        else if (!mis) {
-            color += brdf * lemit * owl::abs(wi_local.z) / light_pdf;
-        }
-    }
-
-    return color;
-}
-
-__device__
-owl::common::vec3f sampleLightSourceNoVis(SurfaceInteraction si, int lightIdx, float lightSelectionPdf, owl::common::vec2f rand, bool mis)
-{
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    float light_pdf = 0.f, brdf_pdf = 0.f;
-    TriLight triLight = optixLaunchParams.triLights[lightIdx];
-
-    owl::common::vec3f lv1 = triLight.v1;
-    owl::common::vec3f lv2 = triLight.v2;
-    owl::common::vec3f lv3 = triLight.v3;
-    owl::common::vec3f lnormal = triLight.normal;
-    owl::common::vec3f lemit = triLight.emit;
-    float larea = triLight.area;
-
-    owl::common::vec3f lpoint = samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
-    owl::common::vec3f wi = normalize(lpoint - si.p);
-    owl::common::vec3f wi_local = normalize(apply_mat(si.to_local, wi));
-
-    float xmy = pow(owl::length(lpoint - si.p), 2.f);
-    float lDotWi = owl::abs(owl::dot(lnormal, -wi));
-
-    light_pdf = lightSelectionPdf * (xmy / (larea * lDotWi));
-
-    ShadowRay ray;
-    ray.origin = si.p + 1e-3f * si.n_geom;
-    ray.direction = wi;
-
-    ShadowRayData srd;
-    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-    if (si.wo_local.z > 0.f && wi_local.z > 0.f && light_pdf > 0.f) {
-        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        if (mis && brdf_pdf > 0.f) {
-            float weight = PowerHeuristic(1, light_pdf, 1, brdf_pdf);
-            color += brdf * lemit * owl::abs(wi_local.z) * weight / light_pdf;
-        }
-        else if (!mis) {
-            color += brdf * lemit * owl::abs(wi_local.z) / light_pdf;
-        }
-    }
-
-    return color;
-}
-
-__device__
-owl::common::vec3f sampleBRDF(SurfaceInteraction si, float lightSelectionPdf, owl::common::vec2f rand, bool mis)
-{
-    owl::common::vec3f wi_local = sample_GGX(rand, si.alpha, si.wo_local);
-    owl::common::vec3f wi = normalize(apply_mat(si.to_world, wi_local));
-
-    ShadowRay ray;
-    ShadowRayData srd;
-    ray.origin = si.p + 1e-3f * si.n_geom;
-    ray.direction = wi;
-    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    float light_pdf = 0.f, brdf_pdf = 0.f;
-
-    if (wi_local.z > 0.f && si.wo_local.z > 0.f && srd.visibility != owl::common::vec3f(0.f)) {
-        float xmy = pow(owl::length(srd.point - si.p), 2.f);
-        float lDotWi = owl::abs(owl::dot(srd.normal, -wi));
-        light_pdf = lightSelectionPdf * (xmy / (srd.area * lDotWi));
-
-        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        if (mis && light_pdf > 0.f && brdf_pdf > 0.f) {
-            float weight = PowerHeuristic(1, brdf_pdf, 1, light_pdf);
-            color += brdf * srd.emit * owl::abs(wi_local.z) * weight / brdf_pdf;
-        }
-        else if (!mis && brdf_pdf > 0.f) {
-            color += brdf * srd.emit * owl::abs(wi_local.z) / brdf_pdf;
-        }
-    }
-
-    return color;
-}
-
-__device__
-owl::common::vec3f sampleBRDFNoNLTest(SurfaceInteraction si, float lightSelectionPdf, owl::common::vec2f rand, bool mis)
-{
-    owl::common::vec3f wi_local = sample_GGX(rand, si.alpha, si.wo_local);
-    owl::common::vec3f wi = normalize(apply_mat(si.to_world, wi_local));
-
-    ShadowRay ray;
-    ShadowRayData srd;
-    ray.origin = si.p + 1e-3f * si.n_geom;
-    ray.direction = wi;
-    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    float light_pdf = 0.f, brdf_pdf = 0.f;
-
-    if (srd.visibility != owl::common::vec3f(0.f)) {
-        float xmy = pow(owl::length(srd.point - si.p), 2.f);
-        float lDotWi = owl::abs(owl::dot(srd.normal, -wi));
-        light_pdf = lightSelectionPdf * (xmy / (srd.area * lDotWi));
-
-        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        if (mis && light_pdf > 0.f && brdf_pdf > 0.f) {
-            float weight = PowerHeuristic(1, brdf_pdf, 1, light_pdf);
-            color += brdf * srd.emit * owl::abs(wi_local.z) * weight / brdf_pdf;
-        }
-        else if (!mis && brdf_pdf > 0.f) {
-            color += brdf * srd.emit * owl::abs(wi_local.z) / brdf_pdf;
-        }
-    }
-
-    return color;
-}
-
-__device__
-owl::common::vec3f sampleBRDFNoVis(SurfaceInteraction si, float lightSelectionPdf, owl::common::vec2f rand, bool mis)
-{
-    owl::common::vec3f wi_local = sample_GGX(rand, si.alpha, si.wo_local);
-    owl::common::vec3f wi = normalize(apply_mat(si.to_world, wi_local));
-
-    ShadowRay ray;
-    ShadowRayData srd;
-    ray.origin = si.p + 1e-3f * si.n_geom;
-    ray.direction = wi;
-    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    float light_pdf = 0.f, brdf_pdf = 0.f;
-
-    if (true) {
-        float xmy = pow(owl::length(srd.point - si.p), 2.f);
-        float lDotWi = owl::abs(owl::dot(srd.normal, -wi));
-        light_pdf = lightSelectionPdf * (xmy / (srd.area * lDotWi));
-
-        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        if (mis && light_pdf > 0.f && brdf_pdf > 0.f) {
-            float weight = PowerHeuristic(1, brdf_pdf, 1, light_pdf);
-            color += brdf * srd.emit * owl::abs(wi_local.z) * weight / brdf_pdf;
-        }
-        else if (!mis && brdf_pdf > 0.f) {
-            color += brdf * srd.emit * owl::abs(wi_local.z) / brdf_pdf;
-        }
-    }
-
-    return color;
-}
-
-__device__
-owl::common::vec3f estimateDirectLighting(SurfaceInteraction& si, LCGRand& rng, int type)
-{
-    owl::common::vec2f rand1 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-    owl::common::vec2f rand2 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-
-    owl::common::vec3f lightSample = owl::common::vec3f(0.f);
-    owl::common::vec3f brdfSample = owl::common::vec3f(0.f);
-    owl::common::vec3f color = owl::common::vec3f(0.f);
-
-    if (type == 0) {
-        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-        float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
-
-        lightSample = sampleLightSource(si, selectedTriLight, lightSelectionPdf, rand1, false);
-
-        color = lightSample;
-    }
-    else if (type == 1) {
-        brdfSample = sampleBRDF(si, 0.f, rand2, false);
-
-        color = brdfSample;
-    }
-    else if (type == 2) {
-        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-        float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
-
-        brdfSample = sampleBRDF(si, lightSelectionPdf, rand1, true);
-        lightSample = sampleLightSource(si, selectedTriLight, lightSelectionPdf, rand2, true);
-
-        color = brdfSample + lightSample;
-    }
-    else if (type == 3) {
-        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-        float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
-
-        brdfSample = sampleBRDFNoNLTest(si, lightSelectionPdf, rand1, true);
-        lightSample = sampleLightSourceNoNLTest(si, selectedTriLight, lightSelectionPdf, rand2, true);
-
-        color = brdfSample + lightSample;
-    }
-    else if (type == 4) {
-        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-        float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
-
-        brdfSample = sampleBRDFNoVis(si, lightSelectionPdf, rand1, true);
-        lightSample = sampleLightSourceNoVis(si, selectedTriLight, lightSelectionPdf, rand2, true);
-
-        color = brdfSample + lightSample;
-    }
-
-    // Make sure there are no negative colors!
-    color.x = owl::max(0.f, color.x);
-    color.y = owl::max(0.f, color.y);
-    color.z = owl::max(0.f, color.z);
-
-    return color;
-}
-/*
-__device__
-owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng)
-{
-    owl::common::vec3f color = owl::common::vec3f(0.f);
-    SurfaceInteraction _dummy_si = si;
-    if (si.isLight)
-        return si.emit;
-    owl::common::vec3f tp(1., 1., 1.);
-    for (int ray_depth = 0; ray_depth < 8; ray_depth++)
-    {   
+    for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
+    {
         owl::common::vec2f rand1 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
         owl::common::vec2f rand2 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
 
-        int selectedTriLight = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-        float lightSelectionPdf = 1.f / optixLaunchParams.numTriLights;
-
-        owl::common::vec3f light_sample(0.f, 0.f, 0.f), brdf_sample(0., 0., 0.);
-        owl::common::vec2i pixel_id = owl::getLaunchIndex();
-        bool mis = false; //  CHECk
-        // Light sampling
-        //{
-        //    float light_pdf = 0.f, brdf_pdf = 0.f;
-        //    TriLight triLight = optixLaunchParams.triLights[selectedTriLight];
-
-        //    owl::common::vec3f lv1 = triLight.v1;
-        //    owl::common::vec3f lv2 = triLight.v2;
-        //    owl::common::vec3f lv3 = triLight.v3;
-        //    owl::common::vec3f lnormal = triLight.normal;
-        //    owl::common::vec3f lemit = triLight.emit;
-        //    float larea = triLight.area;
-
-        //    owl::common::vec3f lpoint = samplePointOnTriangle(lv1, lv2, lv3, rand1.x, rand1.y);
-        //    owl::common::vec3f wi = normalize(lpoint - si.p);
-        //    owl::common::vec3f wi_local = normalize(apply_mat(si.to_local, wi));
-
-        //    float xmy = pow(owl::length(lpoint - si.p), 2.f);
-        //    float lDotWi = owl::abs(owl::dot(lnormal, -wi));
-
-        //    light_pdf = lightSelectionPdf * (xmy / (larea * lDotWi));
-
-        //    ShadowRay ray;
-        //    ray.origin = si.p + 1e-3f * si.n_geom;
-        //    ray.direction = wi;
-        //    //if(pixel_id.x == 1024 && pixel_id.y == 1024)
-        //    //    printf("light %f, %f, %f\n", si.p.x, si.p.x, si.p.x);
-        //    ShadowRayData srd;
-        //    owl::traceRay(optixLaunchParams.world, ray, srd);
-
-        //    if (si.wo_local.z > 0.f && wi_local.z > 0.f && srd.visibility != owl::common::vec3f(0.f) && light_pdf > 0.f && owl::dot(-wi, lnormal) > 0.f) {
-        //        owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-        //        brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-
-        //        if (mis && brdf_pdf > 0.f) {
-        //            float weight = PowerHeuristic(1, light_pdf, 1, brdf_pdf);
-        //            color += tp * brdf * lemit * owl::abs(wi_local.z) * weight / light_pdf;
-        //        }
-        //        else if (!mis) {
-        //            color += tp * brdf * lemit * owl::abs(wi_local.z) / light_pdf;
-        //        }
-        //    }
-        //    //light_sample *= owl::abs(owl::dot(owl::normalize(si.n_geom), owl::normalize(srd.point - si.p)));
-        }
-        // BRDF sampling
-        float lidotN = 0.;
-        float lDotWi = 0.;
-        SurfaceInteraction _si;
+        owl::common::vec3f V = si.wo; // Global direction
+        // MIS
         {
-
-
-            owl::common::vec3f wi_local = sample_GGX(rand2, si.alpha, si.wo_local);
-            owl::common::vec3f wi = normalize(apply_mat(si.to_world, wi_local));
-
-            ShadowRayData srd;
-
-            ShadowRay shadow_ray;
-            RadianceRay rad_ray;
-            rad_ray.origin = si.p + 1e-3f * si.n_geom;
-            rad_ray.direction = wi;
-
+            int selectedLightIdx = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
             
-            shadow_ray.origin = si.p + 1e-3f * si.n_geom;
-            shadow_ray.direction = wi;
-            owl::traceRay(optixLaunchParams.world, rad_ray, _si);
-            owl::traceRay(optixLaunchParams.world, shadow_ray, srd);
+            float lightPdf = sampleLightPdf(selectedLightIdx);
 
-            float light_pdf = 0.f, brdf_pdf = 0.f;
-            
-            lDotWi = owl::abs(owl::dot(_si.n_geom, -wi));
-            lidotN = max(1e-6, owl::dot(_si.n_geom, -wi));
-            owl::common::vec3f brdf = evaluate_brdf(si.wo_local, wi_local, si.diffuse, si.alpha);
-            brdf_pdf = get_brdf_pdf(si.alpha, si.wo_local, normalize(si.wo_local + wi_local));
-            //return owl::common::vec3f(lDotWi);
-            if (wi_local.z > 0.f && si.wo_local.z > 0.f && srd.visibility != owl::common::vec3f(0.f)) {
-                float xmy = pow(owl::length(srd.point - si.p), 2.f);
+            owl::common::vec3f pos = sampleLight(selectedLightIdx, rand1);
+            owl::common::vec3f newPos = si.p;
 
-                light_pdf = lightSelectionPdf * (xmy / (srd.area * lDotWi));
+            owl::common::vec3f L = normalize(pos - newPos);  // incoming from light
+            float dist = owl::common::length(pos - newPos);
+            dist = dist * dist;
 
-                if (mis && light_pdf > 0.f && brdf_pdf > 0.f) {
-                    float weight = PowerHeuristic(1, brdf_pdf, 1, light_pdf);
-                    color += tp * brdf * srd.emit * owl::abs(wi_local.z) * weight / brdf_pdf;
-                }
-                else if (!mis && brdf_pdf > 0.f) {
-                    color += tp * brdf * srd.emit * owl::abs(wi_local.z) / brdf_pdf;
-                }
-                break;
+            owl::common::vec3f tNormal;
+            if (si.hit && si.isLight) {
+                owl::common::vec3f H = normalize(V + L);
+
+                float brdfPdf;
+                owl::common::vec3f brdf = evalBSDF(mat, normal, H, V, L, newPos, brdfPdf);
+
+                float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, tNormal));
+
+                float misW = lightPdfW / (lightPdfW + brdfPdf);
+
+                contrib += misW * tMat.color * tp * brdf * clampDot(normal, L, true) /
+                    lightPdfW;
             }
-            tp *= lidotN * brdf / brdf_pdf;
-
-            if (!_si.hit)
-                break;
-            si = _si;
         }
     }
-    si = _dummy_si;
-    return color;
-}*/
+}
 
 
 __device__
@@ -667,12 +216,10 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
 
     const owl::common::vec2f screen = (owl::common::vec2f(pixelId) + owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng))) / owl::common::vec2f(self.frameBufferSize);
     RadianceRay ray;
-    ray.origin
-        = optixLaunchParams.camera.pos;
-    ray.direction
-        = normalize(optixLaunchParams.camera.dir_00
-            + screen.u * optixLaunchParams.camera.dir_du
-            + screen.v * optixLaunchParams.camera.dir_dv);
+    ray.origin = optixLaunchParams.camera.pos;
+    ray.direction = normalize(optixLaunchParams.camera.dir_00
+                                + screen.u * optixLaunchParams.camera.dir_du
+                                + screen.v * optixLaunchParams.camera.dir_dv);
 
     SurfaceInteraction si;
     owl::traceRay(optixLaunchParams.world, ray, si);
@@ -694,25 +241,6 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         color = si.alpha;
     else if (optixLaunchParams.rendererType == NORMALS)
         color = si.n_geom;
-    // Direct lighting with MC
-    else if (optixLaunchParams.rendererType == DIRECT_LIGHT_LSAMPLE) {
-        if (si.isLight)
-            color = si.emit;
-        else
-            color = estimateDirectLighting(si, rng, 0);
-    }
-    else if (optixLaunchParams.rendererType == DIRECT_LIGHT_BRDFSAMPLE) {
-        if (si.isLight)
-            color = si.emit;
-        else
-            color = estimateDirectLighting(si, rng, 1);
-    }
-    else if (optixLaunchParams.rendererType == DIRECT_LIGHT_MIS) {
-        if (si.isLight)
-            color = si.emit;
-        else
-            color = estimateDirectLighting(si, rng, 2);
-    }
     // Direct lighting with LTC
     else if (optixLaunchParams.rendererType == LTC_BASELINE) {
         if (si.isLight)
@@ -729,11 +257,11 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             color = si.emit;
         else {
             ltc_color = ltcDirectLighingBaseline(si, rng);
-            for (int i = 0; i < 4; i++)
+           /* for (int i = 0; i < 4; i++)
             {
                 sto_S += estimateDirectLighting(si, rng, 3);
                 sto_U += estimateDirectLighting(si, rng, 4);
-            }
+            }*/
 
             color.x = (sto_U.x < 1e-4) ? 0. : ltc_color.x * sto_S.x / sto_U.x;
             color.y = (sto_U.y < 1e-4) ? 0. : ltc_color.y * sto_S.y / sto_U.y;
@@ -742,13 +270,13 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         }
 
     }
-    //else if (optixLaunchParams.rendererType == PATH)
-    //{
-    //    int n = 1;
-    //    for(int i=0;i<n;i++)
-    //       color += estimatePathTracing(si, rng);
-    //    color /= n;
-    //}
+    else if (optixLaunchParams.rendererType == PATH)
+    {
+        int n = 1;
+        for(int i=0;i<n;i++)
+           color += estimatePathTracing(si, rng);
+        color /= n;
+    }
     else {
         color = owl::common::vec3f(1., 0., 0.);
     }

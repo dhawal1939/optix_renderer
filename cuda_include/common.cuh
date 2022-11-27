@@ -138,8 +138,6 @@ struct MissProgData {
 struct ShadowRayData {
 	owl::common::vec3f visibility = owl::common::vec3f(0.f);
 	owl::common::vec3f point = owl::common::vec3f(0.f), normal = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
-	owl::common::vec3f emit = owl::common::vec3f(0.f);
-	float area = 0.f;
 };
 
 
@@ -159,5 +157,6 @@ struct SurfaceInteraction {
 	owl::common::vec3f emit = owl::common::vec3f(0.f);
 	bool isLight = false;
 
+	float area = 0.f;
 	owl::common::vec3f to_local[3], to_world[3];
 };
