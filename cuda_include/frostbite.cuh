@@ -50,7 +50,10 @@ float GGX(float alpha, owl::common::vec3f V, owl::common::vec3f L) {
     Fresnel is not used (commented).
     Evaluates only f (i.e. BRDF without cosine foreshortening) */
 __device__
-owl::common::vec3f evaluate_brdf(owl::common::vec3f wo, owl::common::vec3f wi, owl::common::vec3f diffuse_color, float alpha) {
+owl::common::vec3f evaluate_brdf(owl::common::vec3f wo, 
+    owl::common::vec3f wi, 
+    owl::common::vec3f diffuse_color, 
+    float alpha) {
     owl::common::vec3f brdf = owl::common::vec3f(0.0f);
 
     // Diffuse + specular
@@ -61,11 +64,13 @@ owl::common::vec3f evaluate_brdf(owl::common::vec3f wo, owl::common::vec3f wi, o
 }
 
 __device__
-float get_brdf_pdf(float alpha, owl::common::vec3f V, owl::common::vec3f Ne) {
+float get_brdf_pdf(float alpha, 
+    owl::common::vec3f V, owl::common::vec3f Ne) {
     float cosT = Ne.z;
     float alphasq = alpha * alpha;
 
     float num = alphasq * cosT;
+    //printf("num %d\n", num);
     float denom = PI * pow((alphasq - 1.f) * cosT * cosT + 1.f, 2.f);
 
     float pdf = num / denom;
@@ -73,7 +78,9 @@ float get_brdf_pdf(float alpha, owl::common::vec3f V, owl::common::vec3f Ne) {
 }
 
 __device__
-owl::common::vec3f sample_GGX(owl::common::vec2f rand, float alpha, owl::common::vec3f V) {
+owl::common::vec3f sample_GGX(
+    owl::common::vec2f rand, 
+    float alpha, owl::common::vec3f V) {
     float num = 1.f - rand.x;
     float denom = rand.x * (alpha * alpha - 1.f) + 1;
     float t = acos(owl::sqrt(num / denom));

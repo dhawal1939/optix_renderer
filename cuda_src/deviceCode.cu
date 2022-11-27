@@ -79,6 +79,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
 
     // UV coordinate of the hit point
     si.uv = barycentricInterpolate(self.texCoord, primitiveIndices);
+    si.uv.x = owl::common::abs(fmodf(si.uv.x, 1.));
+    si.uv.y = owl::common::abs(fmodf(si.uv.y, 1.));
 
     // geometric normal 
     si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
@@ -499,7 +501,7 @@ owl::common::vec3f estimateDirectLighting(SurfaceInteraction& si, LCGRand& rng, 
 
     return color;
 }
-
+/*
 __device__
 owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng)
 {
@@ -561,7 +563,7 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng)
         //        }
         //    }
         //    //light_sample *= owl::abs(owl::dot(owl::normalize(si.n_geom), owl::normalize(srd.point - si.p)));
-        //}
+        }
         // BRDF sampling
         float lidotN = 0.;
         float lDotWi = 0.;
@@ -579,9 +581,7 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng)
             rad_ray.origin = si.p + 1e-3f * si.n_geom;
             rad_ray.direction = wi;
 
-            /*if (pixel_id.x == 1024 && pixel_id.y == 1024)
-                printf("brdf %f, %f, %f\n", si.p.x, si.p.x, si.p.x);
-            */
+            
             shadow_ray.origin = si.p + 1e-3f * si.n_geom;
             shadow_ray.direction = wi;
             owl::traceRay(optixLaunchParams.world, rad_ray, _si);
@@ -617,7 +617,7 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng)
     }
     si = _dummy_si;
     return color;
-}
+}*/
 
 
 __device__
@@ -742,13 +742,13 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         }
 
     }
-    else if (optixLaunchParams.rendererType == PATH)
-    {
-        int n = 1;
-        for(int i=0;i<n;i++)
-           color += estimatePathTracing(si, rng);
-        color /= n;
-    }
+    //else if (optixLaunchParams.rendererType == PATH)
+    //{
+    //    int n = 1;
+    //    for(int i=0;i<n;i++)
+    //       color += estimatePathTracing(si, rng);
+    //    color /= n;
+    //}
     else {
         color = owl::common::vec3f(1., 0., 0.);
     }
