@@ -1,11 +1,10 @@
 #pragma once
 #include <common.h>
-
 #include <optix.h>
+#include <optix_device.h>
 #include <cuda_runtime.h>
-
 #include <owl/common/math/vec.h>
-
+#include <texture_fetch_functions.h>
 __device__
 owl::common::vec3f barycentricInterpolate(owl::common::vec3f* tex, owl::common::vec3i index)
 {

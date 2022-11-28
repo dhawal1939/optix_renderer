@@ -10,7 +10,7 @@ int main(int argc, char** argv)
     bool isInteractive = true;
 
     std::string currentScene;
-    std::string defaultScene = "C:/Users/dhawals/repos/optix_renderer/scenes/scene_configs/bistro.json";
+    std::string defaultScene = "C:/Users/dhawals/repos/optix_renderer/scenes/scene_configs/test_scene.json";
 
     /*if (argc == 2)
         currentScene = std::string(argv[1]);
@@ -33,10 +33,8 @@ int main(int argc, char** argv)
 
     owl::common::vec2i resolution(scene.imgWidth, scene.imgHeight);
     printf("%d %d reso\n", resolution.x, resolution.y);
-    std::string savePath = "C:/Users/dhawals/repos/optix_renderer/mask.png";
-    Viewer win(scene, resolution, DIFFUSE);
+    Viewer win(scene, resolution, PATH);
 
-    win.to_save_file = savePath;
 
     if (isInteractive)
     {
