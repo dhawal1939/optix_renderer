@@ -141,7 +141,8 @@ void matrixInverse(owl::common::vec3f m[3], owl::common::vec3f minv[3]) {
 __device__
 owl::common::vec3f getPerpendicularVector(owl::common::vec3f _vec)
 {
-    owl::common::vec3f x = owl::common::dot(_vec, owl::common::vec3f(0.f, 0.f, 1.f)) < owl::common::dot(_vec, owl::common::vec3f(0.f, 1.f, 0.f)) ?
+    owl::common::vec3f x = owl::common::dot(_vec, owl::common::vec3f(0.f, 0.f, 1.f)) < 
+        owl::common::dot(_vec, owl::common::vec3f(0.f, 1.f, 0.f)) ?
         owl::common::vec3f(0.f, 0.f, 1.f) : owl::common::vec3f(0.f, 1.f, 0.f);
     return (owl::common::dot(_vec, x) < owl::common::dot(x, owl::common::vec3f(1.f, 0., 0.)) ? x : owl::common::vec3f(1., 0., 0.));
 }

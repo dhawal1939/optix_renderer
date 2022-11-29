@@ -91,9 +91,12 @@ float get_brdf_pdf(float alpha, owl::common::vec3f V, owl::common::vec3f N, owl:
 __device__
 owl::common::vec3f sample_GGX(owl::common::vec2f rand, float alpha, owl::common::vec3f hitNorm)
 {
-    // Get an orthonormal basis from the normal
     owl::common::vec2f randVal = rand;
 
+    // Get an orthonormal basis from the normal
+    // reflection -- assume 0.5
+    // f0 = 0.16f * reflectance *  reflectance  * (float3(1.0f, 1.0f, 1.0f)  - metalness) + albedo * metalness;
+    //check whether B T N form a right handed system. also check normalization normalize and then check right handed or not.
     owl::common::vec3f B = getPerpendicularVector(hitNorm);
     owl::common::vec3f T = owl::common::cross(B, hitNorm);
 
