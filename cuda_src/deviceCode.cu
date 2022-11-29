@@ -132,7 +132,7 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 __device__
 owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int max_ray_depth = 1)
 {
-    owl::common::vec3f color(0.2f, 0.2f, 0.2f);
+    owl::common::vec3f color(0.f, 0.f, 0.f);
 
     SurfaceInteraction current_si = si;
     if (current_si.isLight)
@@ -179,7 +179,7 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
         }
         //BRDF Sampling
         {
-            owl::common::vec3f H = sample_GGX(rand2, current_si.alpha, V); // do all in global
+            owl::common::vec3f H = sample_GGX(rand2, current_si.alpha, current_si.n_geom); // do all in global
 
             owl::common::vec3f L = owl::common::normalize(2.f * owl::common::dot(V, H) * H - V);
             owl::common::vec3f brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_si.alpha);
@@ -206,9 +206,12 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
                 break;
             }
             current_si = _si;
+            current_si.wo *= -1;
         }
-        current_si.wo *= -1;
     }
+    color.x = owl::common::max(color.x, 0.f);
+    color.y = owl::common::max(color.y, 0.f);
+    color.z = owl::common::max(color.z, 0.f);
     return color;
 }
 
@@ -328,21 +331,16 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     }
     else if (optixLaunchParams.rendererType == PATH)
     {   
-        float spp = 1;
-        for(int i=0;i<spp;i++)
-         color += estimatePathTracing(si, rng);
-        color /= spp;
+        color = estimatePathTracing(si, rng);
     }
     else {
         color = owl::common::vec3f(1., 0., 0.);
     }
-    /*
     if (optixLaunchParams.accumId > 0)
         color = color + owl::common::vec3f(optixLaunchParams.accumBuffer[fbOfs].x, optixLaunchParams.accumBuffer[fbOfs].y,
             optixLaunchParams.accumBuffer[fbOfs].z);
     optixLaunchParams.accumBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-    color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
-    */
 
+    color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
     self.frameBuffer[fbOfs] = owl::make_rgba(color);
 }

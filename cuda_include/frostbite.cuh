@@ -62,9 +62,9 @@ owl::common::vec3f evaluate_brdf(owl::common::vec3f V, owl::common::vec3f N, owl
     owl::common::vec3f F = schlickFresnel(diffuse_color, LdotH);
     brdf = D * G * F / (4 * NdotL * NdotV);
 
-    // Diffuse pdf == 1 /PI
-    //brdf += diffuse_color * float(1 / PI);
-    return brdf;
+    // Diffuse pdf == 1 /PI; Use metalicity for weighing metalicity = 0.5
+    brdf += diffuse_color * float(1 / PI);
+    return brdf / 2.f;
 }
 
 __device__
