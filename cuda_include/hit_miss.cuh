@@ -10,41 +10,6 @@
 #include <vector_types.h>
 #include <texture_fetch_functions.h>
 
-//OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCHShadow)()
-//{
-//    const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
-//    const owl::common::vec3i primitiveIndices = self.index[optixGetPrimitiveIndex()];
-//    ShadowRayData& srd = owl::getPRD<ShadowRayData>();
-//
-//    if (self.isLight) {
-//        srd.visibility = owl::common::vec3f(1.f);
-//        srd.point = barycentricInterpolate(self.vertex, primitiveIndices);
-//        srd.normal = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-//        srd.emit = self.emit;
-//
-//        owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
-//        owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
-//        owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
-//        srd.area = 0.5f * length(cross(v1 - v2, v3 - v2));
-//
-//        srd.cg = (v1 + v2 + v3) / 3.f;
-//    }
-//    else {
-//        srd.visibility = owl::common::vec3f(0.f);
-//        srd.point = barycentricInterpolate(self.vertex, primitiveIndices);
-//        srd.normal = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-//        srd.emit = owl::common::vec3f(0.);
-//
-//        owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
-//        owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
-//        owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
-//        srd.area = 0.5f * length(cross(v1 - v2, v3 - v2));
-//
-//        srd.cg = (v1 + v2 + v3) / 3.f;
-//    }
-//
-//}
-
 OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
 {
     const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
@@ -73,12 +38,12 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
     // geometric normal 
     si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
     // if bump map exists
-    if (self.hasNormalTexture)
+   /* if (self.hasNormalTexture)
     {
        float4 normal_vals= tex2D<float4>(self.normal_texture, si.uv.x, si.uv.y);
        si.n_shad = owl::common::vec3f(normal_vals.x, normal_vals.y, normal_vals.z);
        si.n_shad = owl::normalize(si.n_shad);
-    }
+    }*/
     // axix independet prop
     si.diffuse = self.diffuse;
     if (self.hasDiffuseTexture)
@@ -86,7 +51,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
         float4 diffuse_values = tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
         si.diffuse = owl::common::vec3f(diffuse_values.x, diffuse_values.y, diffuse_values.z);
     }
-    si.alpha = self.alpha;
+    si.alpha = 1. - self.alpha;
     if (self.hasAlphaTexture)
     {
         float4 alpha_values = tex2D<float4>(self.alpha_texture, si.uv.x, si.uv.y);
