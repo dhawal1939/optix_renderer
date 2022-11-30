@@ -48,7 +48,8 @@ owl::common::vec3f schlickFresnel(owl::common::vec3f f0, float lDotH)
     Fresnel is not used (commented).
     Evaluates only f (i.e. BRDF without cosine foreshortening) */
 __device__
-owl::common::vec3f evaluate_brdf(owl::common::vec3f V, owl::common::vec3f N, owl::common::vec3f L, owl::common::vec3f diffuse_color, float alpha) {
+owl::common::vec3f evaluate_brdf(owl::common::vec3f V, owl::common::vec3f N, owl::common::vec3f L, 
+    owl::common::vec3f diffuse_color, float alpha, owl::common::vec3f f0) {
     owl::common::vec3f brdf = owl::common::vec3f(0.0f);
 
     owl::common::vec3f H = owl::common::normalize(V + L);
@@ -59,7 +60,7 @@ owl::common::vec3f evaluate_brdf(owl::common::vec3f V, owl::common::vec3f N, owl
 
     float  D = ggxNormalDistribution(NdotH, alpha);
     float  G = schlickMaskingTerm(NdotL, NdotV, alpha);
-    owl::common::vec3f F = schlickFresnel(diffuse_color, LdotH);
+    owl::common::vec3f F = schlickFresnel(f0, LdotH);
     brdf = D * G * F / (4 * NdotL * NdotV);
 
     // Diffuse pdf == 1 /PI; Use metalicity for weighing metalicity = 0.5
