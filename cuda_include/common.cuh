@@ -21,9 +21,6 @@ enum RendererType {
 	SHADE_NORMALS,
 	POSITION,
 	MASK,
-	DIRECT_LIGHT_LSAMPLE,
-	DIRECT_LIGHT_BRDFSAMPLE,
-	DIRECT_LIGHT_MIS,
 	LTC_BASELINE,
 	RATIO,
 	PATH,
@@ -37,9 +34,6 @@ const char* rendererNames[NUM_RENDERER_TYPES] = {
 													"Shading Normals"
 													"Position",
 													"MASK",
-													"Direct Light (Light)",
-													"Direct Light (BRDF)",
-													"Direct Light (MIS)",
 													"LTC Baseline",
 													"RATIO",
 													"PATH"

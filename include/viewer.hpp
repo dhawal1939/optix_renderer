@@ -71,6 +71,8 @@ struct Viewer :public owl::viewer::OWLViewer
 
     int imgui_init(bool _callbacks, const char* gl_version);
 
+    //void savebuffer(FILE* fp);
+
     std::string gl_version;
 
     std::string to_save_file;
@@ -79,7 +81,7 @@ struct Viewer :public owl::viewer::OWLViewer
     void cameraChanged() override;
 
     void key(char key, const owl::common::vec2i& pos) override;
-    //void mouseButtonLeft(const owl::common::vec2i & where, bool pressed) override;
+    void mouseButtonLeft(const owl::common::vec2i & where, bool pressed) override;
 
     void setRendererType(RendererType type);
 
@@ -561,12 +563,50 @@ void Viewer::save_full(const std::string& fileName)
     std::cout << "#owl.viewer: frame buffer written to " << fileName << std::endl;
 }
 
-/*void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
+//void Viewer::savebuffer(FILE* fp)
+//{
+//    const uint32_t* fb
+//        = (const uint32_t*)fbPointer;
+//    
+//    std::vector<uint32_t> pixels;
+//    for (int y = 0; y < fbSize.y; y++) {
+//        const uint32_t* line = fb + (fbSize.y - 1 - y) * fbSize.x;
+//        for (int x = 0; x < fbSize.x; x++) {
+//            pixels.push_back(line[x] | (0xff << 24));
+//        }
+//    }
+//    std::ofstream output_file("C:/Users/dhawals/repos/optix_renderer/rendered_output.ppm");
+//    std::ostream_iterator<std::string> output_iterator(output_file, "\n");
+//    std::copy(pixels.begin(), pixels.end(), output_iterator);
+//}
+
+void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
 {
     if (pressed == true) {
-        owlParamsSet1b(this->launchParams, "clicked", true);
-        owlParamsSet2i(this->launchParams, "pixelId", (const owl2i&)where);
-}*/
+    
+        std::string fileName = "C:/Users/dhawals/repos/optix_renderer/rendered_output.btc";
+        FILE *fp;
+        fp = fopen(fileName.c_str(), "wb");
+        const void* owlbuffer = owlBufferGetPointer(accumBuffer, 0);
+        void* localMemory = calloc(this->fbSize.x * this->fbSize.y, sizeof(float4));
+        cudaMemcpy(localMemory, owlbuffer, this->fbSize.x * this->fbSize.y * sizeof(float4), cudaMemcpyDeviceToHost);
+        if (fp)
+        {
+            int i = 0;
+            void* temp = localMemory;
+            while (i < this->fbSize.x * this->fbSize.y * 4)
+            {
+                ((float*)localMemory)[i] = ((float*)localMemory)[i] / (this->accumId + 1);
+                i++;
+                temp = (void*)((float*)temp + i);
+            }
+            printf("accum id %d\n", this->accumId);
+            fwrite(localMemory, sizeof(float4), this->fbSize.x * this->fbSize.y, fp);
+            fclose(fp);
+        }
+
+    }
+}
 
 void Viewer::key(char key, const owl::common::vec2i& pos)
 {
