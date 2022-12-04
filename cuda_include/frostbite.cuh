@@ -20,7 +20,7 @@ float ggxNormalDistribution(float NdotH, float roughness)
 {
     float a2 = roughness * roughness;
     float d = ((NdotH * a2 - NdotH) * NdotH + 1);
-    return a2 / (d * d * M_PI);
+    return a2 / max(0.001f, (d * d * M_PI));
 }
 
 __device__
@@ -29,10 +29,15 @@ float schlickMaskingTerm(float NdotL, float NdotV, float roughness)
     // Karis notes they use alpha / 2 (or roughness^2 / 2)
     float k = roughness * roughness / 2;
 
+    // Karis also notes they can use the following equation, but only for analytical lights
+    //float k = (roughness + 1)*(roughness + 1) / 8; 
+
     // Compute G(v) and G(l).  These equations directly from Schlick 1994
     //     (Though note, Schlick's notation is cryptic and confusing.)
     float g_v = NdotV / (NdotV * (1 - k) + k);
     float g_l = NdotL / (NdotL * (1 - k) + k);
+
+    // Return G(v) * G(l)
     return g_v * g_l;
 }
 
@@ -53,10 +58,10 @@ owl::common::vec3f evaluate_brdf(owl::common::vec3f V, owl::common::vec3f N, owl
     owl::common::vec3f brdf = owl::common::vec3f(0.0f);
 
     owl::common::vec3f H = owl::common::normalize(V + L);
-    float NdotH = owl::common::clamp(owl::common::dot(N, H), 0.f, 1.f);
-    float NdotV = owl::common::clamp(owl::common::dot(N, V), 0.f, 1.f);
-    float NdotL = owl::common::clamp(owl::common::dot(N, L), 0.f, 1.f);
-    float LdotH = owl::common::clamp(owl::common::dot(L, H), 0.f, 1.f);
+    float NdotH = saturate(owl::common::dot(N, H));
+    float NdotV = saturate(owl::common::dot(N, V));
+    float NdotL = saturate(owl::common::dot(N, L));
+    float LdotH = saturate(owl::common::dot(L, H));
 
     float  D = ggxNormalDistribution(NdotH, alpha);
     float  G = schlickMaskingTerm(NdotL, NdotV, alpha);
@@ -69,7 +74,7 @@ owl::common::vec3f evaluate_brdf(owl::common::vec3f V, owl::common::vec3f N, owl
 }
 
 __device__
-float get_brdf_pdf(float alpha, owl::common::vec3f V, owl::common::vec3f N, owl::common::vec3f H) {
+float get_brdf_pdf(float alpha, owl::common::vec3f V, owl::common::vec3f N, owl::common::vec3f H, owl::common::vec3f L) {
     /*float cosT = Ne.z;
     float alphasq = alpha * alpha;
 
@@ -80,6 +85,7 @@ float get_brdf_pdf(float alpha, owl::common::vec3f V, owl::common::vec3f N, owl:
     return pdf / (4.f * clampDot(V, Ne, false));*/
     float NdotH = owl::common::clamp(owl::common::dot(N, H), 0.f, 1.f);
     float HdotV = owl::common::clamp(owl::common::dot(H, V), 0.f, 1.f);
+    float LdotH = owl::common::clamp(owl::common::dot(L, V), 0.f, 1.f);
 
     float D = ggxNormalDistribution(NdotH, alpha);
 
@@ -98,6 +104,7 @@ owl::common::vec3f sample_GGX(owl::common::vec2f rand, float alpha, owl::common:
     // reflection -- assume 0.5
     // f0 = 0.16f * reflectance *  reflectance  * (float3(1.0f, 1.0f, 1.0f)  - metalness) + albedo * metalness;
     //check whether B T N form a right handed system. also check normalization normalize and then check right handed or not.
+    // Get an orthonormal basis from the normal
     owl::common::vec3f B = getPerpendicularVector(hitNorm);
     owl::common::vec3f T = owl::common::cross(B, hitNorm);
 

@@ -15,6 +15,7 @@
 // // ======================================================================== //
 
 #include <path/path.cuh>
+#include <ratio/ratio.cuh>
 #include <ltc/ltc_utils.cuh>
 
 
@@ -78,6 +79,9 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     owl::traceRay(optixLaunchParams.world, ray, si);
 
     owl::common::vec3f color(0.f, 0.f, 0.f);
+    struct triColor colors;
+    colors.colors[0] = owl::common::vec3f(0.f);
+    colors.colors[1] = owl::common::vec3f(0.f);
     // wo calculation
     {
         // Out going direction pointing toward the pixel location
@@ -113,11 +117,34 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             color = ltcDirectLighingBaseline(si, rng);
     }
     else if (optixLaunchParams.rendererType == RATIO) {
+        if (si.isLight)
+            color = si.emit;
+        else
+        {
+            owl::common::vec3f ltc_color = ltcDirectLighingBaseline(si, rng);
+            int n = 4;
+            for (int i = 0; i < n; i++)
+            {
+                struct triColor temp_colors = ratio_based_shadow(si, rng, 1);
+                colors.colors[0] += temp_colors.colors[0];
+                colors.colors[1] += temp_colors.colors[1];
+            }
+            colors.colors[0] /= n;
+            colors.colors[1] /= n;
+            color = ltc_color;
+            
+            optixLaunchParams.ltc_buffer[fbOfs] = make_float4(ltc_color.x, ltc_color.y, ltc_color.z, 1.f);
+            optixLaunchParams.stoDirectRatio[fbOfs] = make_float4(colors.colors[0].x, colors.colors[0].y, colors.colors[0].z, 1.f);
+            optixLaunchParams.stoNoVisRatio[fbOfs] = make_float4(colors.colors[1].x, colors.colors[1].y, colors.colors[1].z, 1.f);
+            
+        }
     }
     else if (optixLaunchParams.rendererType == PATH)
     {   
-        //color = estimatePathTracingNoVis(si, rng, 1);
-        color = estimatePathTracing(si, rng, 10);
+        if (si.isLight)
+            color = si.emit;
+        else
+           color = estimatePathTracing(si, rng, 1);
     }
     else {
         color = owl::common::vec3f(1., 0., 0.);

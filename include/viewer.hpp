@@ -67,9 +67,9 @@ struct Viewer :public owl::viewer::OWLViewer
     //     this to know our actual render dimensions, and get pointer
     //     to the device frame buffer that the viewer cated for us */
     void resize(const owl::common::vec2i& newSize) override;
-    void save_full(const std::string& fileName);
 
     int imgui_init(bool _callbacks, const char* gl_version);
+    void Viewer::savebuffer(FILE* fp, void* buffer);
 
     //void savebuffer(FILE* fp);
 
@@ -89,6 +89,10 @@ struct Viewer :public owl::viewer::OWLViewer
     bool sbtDirty = true;
 
     OWLBuffer accumBuffer{ 0 };
+    OWLBuffer ltc_buffer{ 0 };
+    OWLBuffer stoDirectRatio{ 0 };
+    OWLBuffer stoNoVisRatio{ 0 };
+
     int accumId = 0;
 
     OWLRayGen rayGen{ 0 };
@@ -143,6 +147,14 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(accumBuffer, this->getWindowSize().x * this->getWindowSize().y);
 
+    ltc_buffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(ltc_buffer, this->getWindowSize().x * this->getWindowSize().y);
+    stoDirectRatio = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(stoDirectRatio, this->getWindowSize().x * this->getWindowSize().y);
+    stoNoVisRatio = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(stoNoVisRatio, this->getWindowSize().x * this->getWindowSize().y);
+
+
     owlContextSetRayTypeCount(context, 2);
 
     // ====================================================
@@ -194,6 +206,11 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         {"numMeshLights", OWL_INT, OWL_OFFSETOF(LaunchParams, numMeshLights)},
         // All other parameters
         {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
+        
+        {"ltc_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, ltc_buffer)},
+        {"stoDirectRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoDirectRatio)},
+        {"stoNoVisRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoNoVisRatio)},
+
         {"accumId", OWL_INT, OWL_OFFSETOF(LaunchParams, accumId)},
         {"rendererType", OWL_INT, OWL_OFFSETOF(LaunchParams, rendererType)},
         {"world", OWL_GROUP, OWL_OFFSETOF(LaunchParams, world)},
@@ -241,6 +258,10 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     // Upload accumulation buffer and ID
     owlParamsSet1i(this->launchParams, "accumId", this->accumId);
     owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
+
+    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
+    owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
 
     // ====================================================
     // Scene setup (scene geometry and materials)
@@ -454,7 +475,16 @@ void Viewer::resize(const owl::common::vec2i& newSize)
 
     // Resize accumulation buffer, and set to launch params
     owlBufferResize(this->accumBuffer, newSize.x * newSize.y);
+
+    owlBufferResize(this->ltc_buffer, newSize.x * newSize.y);
+    owlBufferResize(this->stoDirectRatio, newSize.x * newSize.y);
+    owlBufferResize(this->stoNoVisRatio, newSize.x * newSize.y);
+
     owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
+
+    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
+    owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
 
     // Perform camera move i.e. set new camera parameters, and set SBT to be updated
     this->cameraChanged();
@@ -476,6 +506,9 @@ void Viewer::cameraChanged()
     const owl::common::vec3f lookAt = camera.getAt();
     const owl::common::vec3f lookUp = camera.getUp();
     const float cosFovy = camera.getCosFovy();
+
+    printf("Fovy, %f\n lookfrom %f %f %f\nlookat %f %f %f\nlookup %f %f %f\n",
+        cosFovy, lookFrom.x, lookFrom.y, lookFrom.z, lookAt.x, lookAt.y, lookAt.z, lookUp.x, lookUp.y, lookUp.z);
 
     // ----------- compute variable values  ------------------
     owl::common::vec3f camera_pos = lookFrom;
@@ -534,77 +567,56 @@ void Viewer::drawUI()
 }
 
 
-void Viewer::save_full(const std::string& fileName)
+void Viewer::savebuffer(FILE* fp, void* localMemory)
 {
-    const uint32_t* fb
-        = (const uint32_t*)fbPointer;
-
-    std::vector<uint32_t> pixels;
-    for (int y = 0; y < fbSize.y; y++) {
-        const uint32_t* line = fb + (fbSize.y - 1 - y) * fbSize.x;
-        for (int x = 0; x < fbSize.x; x++) {
-            pixels.push_back(line[x] | (0xff << 24));
-        }
-    }
-    printf("%d Pixels\n", pixels.size());
-
-    std::fstream _file;
-    _file.open("vector_file_2.txt", std::ios_base::out);
-
-    std::vector<std::uint32_t>::iterator itr;
-
-    for (itr = pixels.begin(); itr != pixels.end(); itr++)
+    if (fp && (localMemory != NULL))
     {
-        _file << *itr << std::endl;
+        int i = 0;
+        void* temp = localMemory;
+        while (i < this->fbSize.x * this->fbSize.y * 4)
+        {
+            ((float*)localMemory)[i] = ((float*)localMemory)[i];
+            i++;
+            temp = (void*)((float*)temp + i);
+        }
+        fwrite(localMemory, sizeof(float4), this->fbSize.x * this->fbSize.y, fp);
+        fclose(fp);
     }
-
-    _file.close();
-
-    std::cout << "#owl.viewer: frame buffer written to " << fileName << std::endl;
 }
-
-//void Viewer::savebuffer(FILE* fp)
-//{
-//    const uint32_t* fb
-//        = (const uint32_t*)fbPointer;
-//    
-//    std::vector<uint32_t> pixels;
-//    for (int y = 0; y < fbSize.y; y++) {
-//        const uint32_t* line = fb + (fbSize.y - 1 - y) * fbSize.x;
-//        for (int x = 0; x < fbSize.x; x++) {
-//            pixels.push_back(line[x] | (0xff << 24));
-//        }
-//    }
-//    std::ofstream output_file("C:/Users/dhawals/repos/optix_renderer/rendered_output.ppm");
-//    std::ostream_iterator<std::string> output_iterator(output_file, "\n");
-//    std::copy(pixels.begin(), pixels.end(), output_iterator);
-//}
 
 void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
 {
     if (pressed == true) {
-    
-        std::string fileName = "C:/Users/dhawals/repos/optix_renderer/rendered_output.btc";
-        FILE *fp;
-        fp = fopen(fileName.c_str(), "wb");
-        const void* owlbuffer = owlBufferGetPointer(accumBuffer, 0);
-        void* localMemory = calloc(this->fbSize.x * this->fbSize.y, sizeof(float4));
-        cudaMemcpy(localMemory, owlbuffer, this->fbSize.x * this->fbSize.y * sizeof(float4), cudaMemcpyDeviceToHost);
-        if (fp)
-        {
-            int i = 0;
-            void* temp = localMemory;
-            while (i < this->fbSize.x * this->fbSize.y * 4)
-            {
-                ((float*)localMemory)[i] = ((float*)localMemory)[i] / (this->accumId + 1);
-                i++;
-                temp = (void*)((float*)temp + i);
-            }
-            printf("accum id %d\n", this->accumId);
-            fwrite(localMemory, sizeof(float4), this->fbSize.x * this->fbSize.y, fp);
-            fclose(fp);
-        }
+        
+       void* localMemory = NULL;
 
+        FILE *fp;
+        std::string fileName = "C:/Users/dhawals/repos/optix_renderer/ltc.btc";
+        fp = fopen(fileName.c_str(), "wb");
+        const void* owlbuffer = owlBufferGetPointer(ltc_buffer, 0);
+        localMemory = calloc(this->fbSize.x * this->fbSize.y, sizeof(float4));
+        cudaMemcpy(localMemory, owlbuffer, this->fbSize.x * this->fbSize.y * sizeof(float4), cudaMemcpyDeviceToHost);
+        savebuffer(fp, localMemory);
+        free(localMemory);
+        localMemory = NULL;
+
+        fileName = "C:/Users/dhawals/repos/optix_renderer/stoDirect.btc";
+        fp = fopen(fileName.c_str(), "wb");
+        owlbuffer = owlBufferGetPointer(ltc_buffer, 0);
+        localMemory = calloc(this->fbSize.x * this->fbSize.y, sizeof(float4));
+        cudaMemcpy(localMemory, owlbuffer, this->fbSize.x * this->fbSize.y * sizeof(float4), cudaMemcpyDeviceToHost);
+        savebuffer(fp, localMemory);
+        free(localMemory);
+        localMemory = NULL;
+
+        fileName = "C:/Users/dhawals/repos/optix_renderer/stoNoVis.btc";
+        fp = fopen(fileName.c_str(), "wb");
+        owlbuffer = owlBufferGetPointer(ltc_buffer, 0);
+        localMemory = calloc(this->fbSize.x * this->fbSize.y, sizeof(float4));
+        cudaMemcpy(localMemory, owlbuffer, this->fbSize.x * this->fbSize.y * sizeof(float4), cudaMemcpyDeviceToHost);
+        savebuffer(fp, localMemory);
+        free(localMemory);
+        localMemory = NULL;
     }
 }
 

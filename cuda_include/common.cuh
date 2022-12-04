@@ -80,6 +80,9 @@ struct LaunchParams {
 	owl::common::vec2i pixelId;
 
 	float4* accumBuffer;
+	float4* ltc_buffer;
+	float4* stoDirectRatio;
+	float4* stoNoVisRatio;
 	int accumId;
 
 	int rendererType;

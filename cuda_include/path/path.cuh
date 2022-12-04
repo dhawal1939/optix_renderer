@@ -38,8 +38,7 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
     owl::common::vec3f color(0.f, 0.f, 0.f);
     SurfaceInteraction current_si = si;
     owl::common::vec3f tp(1.f, 1.f, 1.f);
-
-    current_si.wo *= 1.;
+    owl::common::vec3f V = current_si.wo; // here is going from x towards camera at the start
     for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
     {
         if (!current_si.hit)
@@ -52,13 +51,12 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
         }
         owl::common::vec2f rand1 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
         owl::common::vec2f rand2 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-        owl::common::vec3f V = current_si.wo; // here it is incoming fix this
         // going to the camera
 
         int selectedLightIdx = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-        owl::common::vec3f brdf(0.);
         RadianceRay ray;
         SurfaceInteraction brdf_si{ 0 }, light_si{ 0 };
+        float current_alpha = current_si.alpha;
         // MIS
         // Light sampling
         {
@@ -78,38 +76,39 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
 
             if (light_si.isLight) {
                 owl::common::vec3f H = normalize(L + V);
-                float brdfPdf = get_brdf_pdf(current_si.alpha, V, current_si.n_geom, H); // brdf pdf of current point
+                float brdfPdf = get_brdf_pdf(current_alpha, V, current_si.n_geom, H, L); // brdf pdf of current point
                 float metalness = 0.5f, reflectance = 0.5f;
                 owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
                     current_si.diffuse * metalness;
-                brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_si.alpha, owl::common::vec3f(1.f)); // brdf of current point
-                float misW = lightPdfW / (lightPdfW + brdfPdf);
+                owl::common::vec3f brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_alpha, f0); // brdf of current point
+                float misW = balanceHeuristic(1, lightPdfW, 1, brdfPdf);
                 color += misW * light_si.emit * tp * brdf * clampDot(current_si.n_geom, L, false) / lightPdfW;
-                color.x = owl::common::max(color.x, 0.1f);
-                color.y = owl::common::max(color.y, 0.1f);
-                color.z = owl::common::max(color.z, 0.1f);
+                color.x = owl::common::max(color.x, EPS);
+                color.y = owl::common::max(color.y, EPS);
+                color.z = owl::common::max(color.z, EPS);
             }
         }
         //BRDF Sampling
         {
-            owl::common::vec3f H = sample_GGX(rand2, current_si.alpha, current_si.n_geom); // do all in global
+            owl::common::vec3f H = sample_GGX(rand2, current_alpha, current_si.n_geom); // do all in global
 
-            owl::common::vec3f L = owl::common::normalize(2.f * owl::common::dot(V, H) * H - V);
+            //owl::common::vec3f L = owl::common::normalize(2.f * owl::common::dot(V, H) * H - V);
+            owl::common::vec3f L = owl::common::normalize(-V - 2.f * owl::common::dot(-V, H) * H);
 
-            ray.origin = current_si.p + float(1e-3) * current_si.n_geom;
+            ray.origin = current_si.p + EPS * current_si.n_geom;
             ray.direction = L;
 
             owl::traceRay(optixLaunchParams.world, ray, brdf_si);
 
             if (!brdf_si.hit)
-                return color;
+                break;
             float metalness = 0.5f, reflectance = 0.5f;
             owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
                 current_si.diffuse * metalness;
-            owl::common::vec3f brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_si.alpha, owl::common::vec3f(1.f));
-            float brdfPdf = get_brdf_pdf(current_si.alpha, V, current_si.n_geom, H);
+            owl::common::vec3f brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_alpha, f0);
+            float brdfPdf = get_brdf_pdf(current_alpha, V, current_si.n_geom, H, L);
 
-            tp *= clampDot(current_si.n_geom, L, false) * brdf / brdfPdf;
+
 
             if (brdf_si.isLight) {
                 // it has hit the light find which light is hit and calculate the pdf of light accordingly.
@@ -117,20 +116,28 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
                 float dist = owl::common::length(brdf_si.p - current_si.p);
                 dist *= dist;
                 float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, brdf_si.n_geom));
-                float misW = brdfPdf / (lightPdfW + brdfPdf);
+                float misW = balanceHeuristic(1, brdfPdf, 1, lightPdfW);
                 // color from next hit _si.emit
                 // remove misW
-                color += misW * brdf_si.emit * tp;
-                color.x = owl::common::max(color.x, 0.1f);
-                color.y = owl::common::max(color.y, 0.1f);
-                color.z = owl::common::max(color.z, 0.1f);
+                color += misW * brdf_si.emit * tp / brdfPdf;
                 break;
             }
+            tp *= clampDot(current_si.n_geom, L, false) * brdf / brdfPdf;
+            /*
+            tp.x = owl::common::max(tp.x, EPS);
+            tp.y = owl::common::max(tp.y, EPS);
+            tp.z = owl::common::max(tp.z, EPS);*/
         }
 
+        // wo calculation
+       // New Out goind direction          
+        V = owl::normalize(current_si.p - brdf_si.p);
         current_si = brdf_si;
-        current_si.wo *= -1;
-
+        current_si.alpha = sqrt(current_si.alpha);
+        current_si.wo = V;
     }
+    color.x = owl::common::max(color.x, EPS);
+    color.y = owl::common::max(color.y, EPS);
+    color.z = owl::common::max(color.z, EPS);
     return color;
 }

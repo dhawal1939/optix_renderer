@@ -195,3 +195,14 @@ float PowerHeuristic(int nf, float fPdf, int ng, float gPdf) {
     float f = nf * fPdf, g = ng * gPdf;
     return (f * f) / (f * f + g * g);
 }
+
+
+__device__
+owl::common::vec3f checkPositive(owl::common::vec3f toClip)
+{
+    owl::common::vec3f values(0.f);
+    values.x = owl::common::max(toClip.x, 0.f);
+    values.y = owl::common::max(toClip.y, 0.f);
+    values.z = owl::common::max(toClip.z, 0.f);
+    return values;
+}
