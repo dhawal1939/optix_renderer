@@ -1,3 +1,4 @@
+#pragma once
 #include <utils.cuh>
 #include <common.cuh>
 #include <ggx_ndf.cuh>
