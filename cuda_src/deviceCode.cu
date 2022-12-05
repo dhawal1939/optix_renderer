@@ -14,9 +14,11 @@
 // // limitations under the License.                                           //
 // // ======================================================================== //
 
+
 #include <path/path.cuh>
 #include <ratio/ratio.cuh>
 #include <ltc/ltc_utils.cuh>
+
 
 __device__
 owl::common::vec3f ltcDirectLighingBaseline(SurfaceInteraction& si, LCGRand& rng)
@@ -72,6 +74,14 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
 
     SurfaceInteraction si;
     owl::traceRay(optixLaunchParams.world, ray, si);
+    // Out going direction pointing toward the pixel location
+    si.wo = owl::normalize(optixLaunchParams.camera.pos - si.p);
+    // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
+    orthonormalBasis(si.n_geom, si.to_local, si.to_world);
+
+    // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
+    si.wo_local = normalize(apply_mat(si.to_local, si.wo));
+
 
     owl::common::vec3f color(0.f, 0.f, 0.f);
     struct triColor colors;
@@ -146,6 +156,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             color = si.emit;
         else
            color = estimatePathTracing(si, rng, 2);
+
     }
     else {
         color = owl::common::vec3f(1., 0., 0.);

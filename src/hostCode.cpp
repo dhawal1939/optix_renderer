@@ -10,7 +10,9 @@ int main(int argc, char** argv)
     bool isInteractive = true;
 
     std::string currentScene;
+
     std::string defaultScene = "C:/Users/dhawals/repos/old_working/optix_renderer/scenes/scene_configs/test_scene3.json";
+
 
     /*if (argc == 2)
         currentScene = std::string(argv[1]);
@@ -33,11 +35,13 @@ int main(int argc, char** argv)
 
     owl::common::vec2i resolution(1024, 1024);
     printf("%d %d reso\n", resolution.x, resolution.y);
+
     //std::string savePath = "C:/Users/dhawals/repos/optix_renderer/mask.png";
     Viewer win(scene, resolution, PATH);
     printf("framebuffer reso %d %d\n", win.getScreenSize().x, win.getScreenSize().y);
 
     //win.to_save_file = savePath;
+
 
     if (isInteractive)
     {
