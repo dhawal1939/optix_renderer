@@ -136,6 +136,16 @@ void matrixInverse(owl::common::vec3f m[3], owl::common::vec3f minv[3]) {
     }
 }
 
+
+__device__
+owl::common::vec3f getPerpendicularVector(owl::common::vec3f _vec)
+{
+    owl::common::vec3f x = owl::common::dot(_vec, owl::common::vec3f(0.f, 0.f, 1.f)) < 
+        owl::common::dot(_vec, owl::common::vec3f(0.f, 1.f, 0.f)) ?
+        owl::common::vec3f(0.f, 0.f, 1.f) : owl::common::vec3f(0.f, 1.f, 0.f);
+    return (owl::common::dot(_vec, x) < owl::common::dot(x, owl::common::vec3f(1.f, 0., 0.)) ? x : owl::common::vec3f(1., 0., 0.));
+}
+
 __device__
 void orthonormalBasis(owl::common::vec3f n, owl::common::vec3f mat[3], owl::common::vec3f invmat[3])
 {
@@ -183,4 +193,15 @@ __device__
 float PowerHeuristic(int nf, float fPdf, int ng, float gPdf) {
     float f = nf * fPdf, g = ng * gPdf;
     return (f * f) / (f * f + g * g);
+}
+
+
+__device__
+owl::common::vec3f checkPositive(owl::common::vec3f toClip)
+{
+    owl::common::vec3f values(0.f);
+    values.x = owl::common::max(toClip.x, 0.f);
+    values.y = owl::common::max(toClip.y, 0.f);
+    values.z = owl::common::max(toClip.z, 0.f);
+    return values;
 }

@@ -1,5 +1,5 @@
+#pragma once
 #include <common.cuh>
-
 
 /*! Returns the intersection of the line connecting the given two points with
 	the plane z == 0.0f.*/
@@ -118,3 +118,6 @@ int clipPolygon(int vertex_count, owl::common::vec3f v[5])
 	};
 	return vc;
 }
+
+
+

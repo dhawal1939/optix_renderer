@@ -23,6 +23,13 @@
 #include <string>
 #include <fstream>
 
+
+#include "owl/owl.h"
+#include "owl/DeviceMemory.h"
+#include "owl/common/math/vec.h"
+#include <owl/helper/optix.h>
+#include "owlViewer/OWLViewer.h"
+
 #include <owl/owl.h>
 #include <owl/common/math/vec.h>
 #include <owl/common/math/random.h>
@@ -67,9 +74,9 @@ struct Viewer :public owl::viewer::OWLViewer
     //     this to know our actual render dimensions, and get pointer
     //     to the device frame buffer that the viewer cated for us */
     void resize(const owl::common::vec2i& newSize) override;
-    void save_full(const std::string& fileName);
 
     int imgui_init(bool _callbacks, const char* gl_version);
+    void Viewer::savebuffer(FILE* fp, OWLBuffer* buffer, int avg_factor);
 
     std::string gl_version;
 
@@ -87,6 +94,13 @@ struct Viewer :public owl::viewer::OWLViewer
     bool sbtDirty = true;
 
     OWLBuffer accumBuffer{ 0 };
+    OWLBuffer ltc_buffer{ 0 };
+    OWLBuffer stoDirectRatio{ 0 };
+    OWLBuffer stoNoVisRatio{ 0 };
+    OWLBuffer albedo{ 0 };
+    OWLBuffer normal{ 0 };
+
+
     int accumId = 0;
 
     OWLRayGen rayGen{ 0 };
@@ -105,8 +119,21 @@ struct Viewer :public owl::viewer::OWLViewer
     std::vector<TriLight> triLightList;
     std::vector<MeshLight> meshLightList;
 
+
     // Random controls
     float lerp = 0.5f;
+
+
+    void denoise(const void* to_denoise);
+    void denoise_setup();
+    owl::common::vec2i numBlocksAndThreads;
+    unsigned int denoiserScratchSize;
+    unsigned int denoiserStateSize;
+    OptixDenoiser denoiser;
+    OWLBuffer denoiserScratch{ 0 };
+    OWLBuffer denoiserState{ 0 };
+    OWLBuffer denoisedBuffer{ 0 };
+    OWL_float denoisedIntensity;
 };
 
 int Viewer::imgui_init(bool _callbacks, const char* gl_version)
@@ -138,8 +165,23 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     context = owlContextCreate(nullptr, 1);
     module = owlModuleCreate(context, deviceCode_ptx);
 
+    ltc_buffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(ltc_buffer, this->getWindowSize().x * this->getWindowSize().y);
+    stoDirectRatio = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(stoDirectRatio, this->getWindowSize().x * this->getWindowSize().y);
+    stoNoVisRatio = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(stoNoVisRatio, this->getWindowSize().x * this->getWindowSize().y);
+
+
+    this->normal = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(stoNoVisRatio, this->getWindowSize().x * this->getWindowSize().y);
+    this->albedo = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(stoNoVisRatio, this->getWindowSize().x * this->getWindowSize().y);
+
     accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(accumBuffer, this->getWindowSize().x * this->getWindowSize().y);
+
+
 
     owlContextSetRayTypeCount(context, 2);
 
@@ -192,6 +234,14 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         {"numMeshLights", OWL_INT, OWL_OFFSETOF(LaunchParams, numMeshLights)},
         // All other parameters
         {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
+        
+        {"ltc_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, ltc_buffer)},
+        {"stoDirectRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoDirectRatio)},
+        {"stoNoVisRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoNoVisRatio)},
+
+        {"albedo", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, albedo)},
+        {"normal", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, normal)},
+
         {"accumId", OWL_INT, OWL_OFFSETOF(LaunchParams, accumId)},
         {"rendererType", OWL_INT, OWL_OFFSETOF(LaunchParams, rendererType)},
         {"world", OWL_GROUP, OWL_OFFSETOF(LaunchParams, world)},
@@ -240,6 +290,13 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     owlParamsSet1i(this->launchParams, "accumId", this->accumId);
     owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
 
+    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
+    owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
+
+    owlParamsSetBuffer(this->launchParams, "normal", this->normal);
+    owlParamsSetBuffer(this->launchParams, "albedo", this->albedo);
+
     // ====================================================
     // Scene setup (scene geometry and materials)
     // ====================================================
@@ -272,7 +329,10 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
             {"alpha", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, alpha)},
             {"alpha_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, alpha_texture)},
             {"hasAlphaTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, hasAlphaTexture)},
-
+            
+            {"normal", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, normal_map)},
+            {"normal_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, hasNormalTexture)},
+            {"hasNormalTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, normal_texture)},
             {nullptr}
         };
 
@@ -289,7 +349,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
 
         // Defines the function name in .cu file, to be used for closest hit processing
         owlGeomTypeSetClosestHit(triangleGeomType, RADIANCE_RAY_TYPE, module, "triangleMeshCH");
-        owlGeomTypeSetClosestHit(triangleGeomType, SHADOW_RAY_TYPE, module, "triangleMeshCHShadow");
+        //owlGeomTypeSetClosestHit(triangleGeomType, SHADOW_RAY_TYPE, module, "triangleMeshCHShadow");
 
         // Create the actual geometry on the device
         OWLGeom triangleGeom = owlGeomCreate(context, triangleGeomType);
@@ -341,6 +401,22 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         else {
             owlGeomSet1f(triangleGeom, "alpha", mesh->alpha);
             owlGeomSet1b(triangleGeom, "hasAlphaTexture", false);
+        }
+
+        if (mesh->normalTextureID != -1) {
+            Texture* normalTexture = model->textures[mesh->normalTextureID];
+            OWLTexture normalTextureBuffer = owlTexture2DCreate(context,
+                OWL_TEXEL_FORMAT_RGBA8,
+                normalTexture->resolution.x,
+                normalTexture->resolution.y,
+                normalTexture->pixel,
+                OWL_TEXTURE_NEAREST,
+                OWL_TEXTURE_CLAMP);
+            owlGeomSetTexture(triangleGeom, "normal_texture", normalTextureBuffer);
+            owlGeomSet1b(triangleGeom, "hasNormalTexture", true);
+        }
+        else {
+            owlGeomSet1b(triangleGeom, "hasNormalTexture", false);
         }
 
         // ====================================================
@@ -432,8 +508,24 @@ void Viewer::resize(const owl::common::vec2i& newSize)
     OWLViewer::resize(newSize);
 
     // Resize accumulation buffer, and set to launch params
+    owlBufferResize(this->stoDirectRatio, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
+    
+    owlBufferResize(this->ltc_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
+
     owlBufferResize(this->accumBuffer, newSize.x * newSize.y);
     owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
+
+    
+    owlBufferResize(this->stoNoVisRatio, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
+
+    owlBufferResize(this->albedo, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "albedo", this->albedo);
+
+    owlBufferResize(this->normal, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "normal", this->normal);
 
     // Perform camera move i.e. set new camera parameters, and set SBT to be updated
     this->cameraChanged();
@@ -456,6 +548,9 @@ void Viewer::cameraChanged()
     const owl::common::vec3f lookUp = camera.getUp();
     const float cosFovy = camera.getCosFovy();
 
+    printf("Fovy, %f\n lookfrom %f %f %f\nlookat %f %f %f\nlookup %f %f %f\n",
+        cosFovy, lookFrom.x, lookFrom.y, lookFrom.z, lookAt.x, lookAt.y, lookAt.z, lookUp.x, lookUp.y, lookUp.z);
+
     // ----------- compute variable values  ------------------
     owl::common::vec3f camera_pos = lookFrom;
     owl::common::vec3f camera_d00 = normalize(lookAt - lookFrom);
@@ -475,6 +570,8 @@ void Viewer::cameraChanged()
     owlParamsSet3f(this->launchParams, "camera.dir_dv", (const owl3f&)camera_ddv);
 
     this->sbtDirty = true;
+
+    this->denoise_setup();
 }
 
 void Viewer::drawUI()
@@ -513,42 +610,72 @@ void Viewer::drawUI()
 }
 
 
-void Viewer::save_full(const std::string& fileName)
+void Viewer::savebuffer(FILE* fp, OWLBuffer* owlbuffer, int avg_factor)
 {
-    const uint32_t* fb
-        = (const uint32_t*)fbPointer;
-
-    std::vector<uint32_t> pixels;
-    for (int y = 0; y < fbSize.y; y++) {
-        const uint32_t* line = fb + (fbSize.y - 1 - y) * fbSize.x;
-        for (int x = 0; x < fbSize.x; x++) {
-            pixels.push_back(line[x] | (0xff << 24));
-        }
-    }
-    printf("%d Pixels\n", pixels.size());
-
-    std::fstream _file;
-    _file.open("vector_file_2.txt", std::ios_base::out);
-
-    std::vector<std::uint32_t>::iterator itr;
-
-    for (itr = pixels.begin(); itr != pixels.end(); itr++)
+    if (fp && (owlbuffer != NULL))
     {
-        _file << *itr << std::endl;
+        int i = 0;
+        void* temp = owlbuffer;
+        const void* owlbuffer_pointer = owlBufferGetPointer(*owlbuffer, 0);
+        void * localMemory = calloc(this->fbSize.x * this->fbSize.y, sizeof(float4));
+        cudaMemcpy(localMemory, owlbuffer_pointer, this->fbSize.x * this->fbSize.y * sizeof(float4), cudaMemcpyDeviceToHost);
+        while (i < this->fbSize.x * this->fbSize.y * 4)
+        {
+            ((float*)localMemory)[i] = ((float*)localMemory)[i] / avg_factor;
+            i++;
+            temp = (void*)((float*)temp + i);
+        }
+        fwrite(localMemory, sizeof(float4), this->fbSize.x * this->fbSize.y, fp);
+        fclose(fp);
     }
-
-    _file.close();
-
-    std::cout << "#owl.viewer: frame buffer written to " << fileName << std::endl;
 }
 
 void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
 {
     if (pressed == true) {
-        //owlParamsSet1b(this->launchParams, "clicked", true);
-        //owlParamsSet2i(this->launchParams, "pixelId", (const owl2i&)where);
-        this->screenShot(this->to_save_file);
-        //this->save_full(this->to_save_file);
+        printf("framesize %d %d\n\n\n", this->fbSize.x, this->fbSize.y);
+        std::string fileName;
+        FILE *fp;
+        if (this->rendererType == RATIO)
+        {
+
+            //this->denoise(owlBufferGetPointer(this->stoDirectRatio, 0));
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/stoDirect.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->stoDirectRatio, 1);
+
+            //this->denoise(owlBufferGetPointer(this->stoNoVisRatio, 0));
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/stoNoVis.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->stoNoVisRatio, 1);
+
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/ltc.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->ltc_buffer, 1);
+
+
+
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/normal.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->normal, 1);
+
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/albedo.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->albedo, 1);
+        }
+        if (this->rendererType == PATH)
+        {
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/path.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->accumBuffer, this->accumId);
+        }
+
+        if (this->rendererType == LTC_BASELINE)
+        {
+            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/ltc_baseline.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->accumBuffer, 1);
+        }
     }
 }
 
@@ -595,4 +722,121 @@ void Viewer::key(char key, const owl::common::vec2i& pos)
         printf("Keypress");
         this->screenShot(this->to_save_file);
     }
+}
+
+void Viewer::denoise_setup()
+{
+    //int frameSize = this->fbSize.x * this->fbSize.y;
+    //owl::common::vec2i frameRes = this->fbSize;
+    //int tileSize = 256;
+    //this->numBlocksAndThreads = owl::common::vec2i(frameRes.y / tileSize, frameRes.x / tileSize);
+    //auto optixContext = owlContextGetOptixContext(context, 0);
+
+    //OptixDenoiserOptions denoiserOptions = {};
+    //optixDenoiserCreate(optixContext, OPTIX_DENOISER_MODEL_KIND_HDR, &denoiserOptions, &denoiser);
+
+    //OptixDenoiserSizes denoiserReturnSizes;
+    //optixDenoiserComputeMemoryResources(this->denoiser, frameRes.x, frameRes.y, &denoiserReturnSizes);
+
+    ///*
+    //size_t denoiserScratchSize;
+    //size_t denoiserStateSize;
+    //OptixDenoiser denoiser;
+    //OWLBuffer denoiserScratch{ 0 };
+    //OWLBuffer denoiserState{ 0 };
+    //OWLBuffer denoisedBuffer{ 0 };
+    //OWL_float denoisedIntensity;
+    //*/
+
+    //this->denoiserScratchSize = std::max(denoiserReturnSizes.withOverlapScratchSizeInBytes, denoiserReturnSizes.withoutOverlapScratchSizeInBytes);
+    //this->denoiserStateSize = denoiserReturnSizes.stateSizeInBytes;
+
+    //cudaMalloc(&this->denoiserScratch, this->denoiserScratchSize);
+    //cudaMalloc(&this->denoiserState, this->denoiserStateSize);
+
+    //denoiserScratch = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    //owlBufferResize(denoiserScratch, this->getWindowSize().x * this->getWindowSize().y);
+
+    //denoiserState = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    //owlBufferResize(denoiserState, this->getWindowSize().x * this->getWindowSize().y);
+
+    //denoisedBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
+    //owlBufferResize(denoisedBuffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    //optixDenoiserSetup(this->denoiser, 
+    //    0,
+    //    frameRes.x, frameRes.y,
+    //    (CUdeviceptr)owlBufferGetPointer(this->denoiserState, 0),
+    //    this->denoiserStateSize,
+    //    (CUdeviceptr)owlBufferGetPointer(this->denoiserScratch, 0),
+    //    this->denoiserScratchSize);
+}
+
+void Viewer::denoise(const void* to_denoise_ptr)
+{
+    //OptixDenoiserParams denoiserParams;
+    //denoiserParams.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_COPY;
+    //denoiserParams.hdrIntensity = (CUdeviceptr)&this->denoisedIntensity;
+    //denoiserParams.blendFactor = 0.0f;
+
+    //OptixImage2D inputLayer[1];
+    //inputLayer[0].data = (CUdeviceptr)to_denoise_ptr;
+    //inputLayer[0].width = this->fbSize.x;
+    //inputLayer[0].height = this->fbSize.y;
+    //inputLayer[0].rowStrideInBytes = this->fbSize.x * sizeof(float4);
+    //inputLayer[0].pixelStrideInBytes = sizeof(float4);
+    //inputLayer[0].format = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+    ///*
+    //inputLayer[1].data = (CUdeviceptr)this->albedo;
+    //inputLayer[1].width = this->fbSize.x;
+    //inputLayer[1].height = this->fbSize.y;
+    //inputLayer[1].rowStrideInBytes = this->fbSize.x * sizeof(float4);
+    //inputLayer[1].pixelStrideInBytes = sizeof(float4);
+    //inputLayer[1].format = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+    //inputLayer[2].data = (CUdeviceptr)this->normal;
+    //inputLayer[2].width = this->fbSize.x;
+    //inputLayer[2].height = this->fbSize.y;
+    //inputLayer[2].rowStrideInBytes = this->fbSize.x * sizeof(float4);
+    //inputLayer[2].pixelStrideInBytes = sizeof(float4);
+    //inputLayer[2].format = OPTIX_PIXEL_FORMAT_FLOAT4;
+    //*/
+
+    //OptixImage2D outputLayer;
+    //outputLayer.data = (CUdeviceptr)owlBufferGetPointer(this->denoisedBuffer, 0);
+    //outputLayer.width = this->fbSize.x;
+    //outputLayer.height = this->fbSize.y;
+    //outputLayer.rowStrideInBytes = this->fbSize.x * sizeof(float4);
+    //outputLayer.pixelStrideInBytes = sizeof(float4);
+    //outputLayer.format = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+    //OptixDenoiserGuideLayer denoiserGuideLayer = {};
+    ///*denoiserGuideLayer.albedo = inputLayer[1];
+    //denoiserGuideLayer.normal = inputLayer[2];*/
+
+    //OptixDenoiserLayer denoiserLayer = {};
+    //denoiserLayer.input = inputLayer[0];
+    //denoiserLayer.output = outputLayer;
+
+    //optixDenoiserComputeIntensity(this->denoiser,
+    //    /*stream*/0,
+    //    &inputLayer[0],
+    //    (CUdeviceptr)&this->denoisedIntensity,
+    //    (CUdeviceptr)owlBufferGetPointer(this->denoiserScratch, 0),
+    //    this->denoiserScratchSize
+    //);
+
+    //optixDenoiserInvoke(this->denoiser,
+    //    /*stream*/0,
+    //    &denoiserParams,
+    //    (CUdeviceptr)owlBufferGetPointer(this->denoiserState, 0),
+    //    this->denoiserStateSize,
+    //    &denoiserGuideLayer,
+    //    &denoiserLayer, 1,
+    //    /*inputOffsetX*/0,
+    //    /*inputOffsetY*/0,
+    //    (CUdeviceptr)owlBufferGetPointer(this->denoiserScratch, 0),
+    //    this->denoiserScratchSize
+    //);
 }

@@ -3,3 +3,8 @@
 lib/owl
 lib/owl/**
 scenes/**
+saves/**
+*.btc
+*.png
+*.jpg
+*.exr

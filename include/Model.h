@@ -39,6 +39,9 @@ namespace osc
         float alpha; // roughness
         int alphaTextureID{ -1 };
 
+        owl::common::vec3f normal_map_vec;
+        int normalTextureID{ -1 };
+
         owl::common::vec3f emit;
 
         // Is light

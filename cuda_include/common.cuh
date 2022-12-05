@@ -18,11 +18,9 @@ enum RendererType {
 	DIFFUSE = 0,
 	ALPHA = 1,
 	NORMALS = 2,
+	SHADE_NORMALS,
 	POSITION,
 	MASK,
-	DIRECT_LIGHT_LSAMPLE,
-	DIRECT_LIGHT_BRDFSAMPLE,
-	DIRECT_LIGHT_MIS,
 	LTC_BASELINE,
 	RATIO,
 	PATH,
@@ -33,11 +31,9 @@ const char* rendererNames[NUM_RENDERER_TYPES] = {
 													"Diffuse",
 													"Alpha",
 													"Normals",
+													"Shading Normals"
 													"Position",
 													"MASK",
-													"Direct Light (Light)",
-													"Direct Light (BRDF)",
-													"Direct Light (MIS)",
 													"LTC Baseline",
 													"RATIO",
 													"PATH"
@@ -80,10 +76,15 @@ struct MeshLight {
 };
 
 struct LaunchParams {
-	//bool clicked;
-	//owl::common::vec2i pixelId;
+	bool clicked;
+	owl::common::vec2i pixelId;
 
 	float4* accumBuffer;
+	float4* ltc_buffer;
+	float4* stoDirectRatio;
+	float4* stoNoVisRatio;
+	float4* normal;
+	float4* albedo;
 	int accumId;
 
 	int rendererType;
@@ -129,6 +130,10 @@ struct TriangleMeshData {
 	float alpha;
 	bool hasAlphaTexture;
 	cudaTextureObject_t alpha_texture;
+
+	float normal_map;
+	bool hasNormalTexture;
+	cudaTextureObject_t normal_texture;
 };
 
 struct MissProgData {
@@ -138,8 +143,6 @@ struct MissProgData {
 struct ShadowRayData {
 	owl::common::vec3f visibility = owl::common::vec3f(0.f);
 	owl::common::vec3f point = owl::common::vec3f(0.f), normal = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
-	owl::common::vec3f emit = owl::common::vec3f(0.f);
-	float area = 0.f;
 };
 
 
@@ -159,5 +162,6 @@ struct SurfaceInteraction {
 	owl::common::vec3f emit = owl::common::vec3f(0.f);
 	bool isLight = false;
 
+	float area = 0.f;
 	owl::common::vec3f to_local[3], to_world[3];
 };
