@@ -83,6 +83,8 @@ struct LaunchParams {
 	float4* ltc_buffer;
 	float4* stoDirectRatio;
 	float4* stoNoVisRatio;
+	float4* normal;
+	float4* albedo;
 	int accumId;
 
 	int rendererType;

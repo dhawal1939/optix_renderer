@@ -133,7 +133,7 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int
        // New Out goind direction          
         V = owl::normalize(current_si.p - brdf_si.p);
         current_si = brdf_si;
-        current_si.alpha = sqrt(current_si.alpha);
+        current_si.alpha = 0.;
         current_si.wo = V;
     }
     color.x = owl::common::max(color.x, EPS);

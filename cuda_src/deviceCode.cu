@@ -18,11 +18,6 @@
 #include <ratio/ratio.cuh>
 #include <ltc/ltc_utils.cuh>
 
-
-
-
-
-
 __device__
 owl::common::vec3f ltcDirectLighingBaseline(SurfaceInteraction& si, LCGRand& rng)
 {
@@ -118,7 +113,12 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     }
     else if (optixLaunchParams.rendererType == RATIO) {
         if (si.isLight)
+        {
             color = si.emit;
+            optixLaunchParams.ltc_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.stoDirectRatio[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.stoNoVisRatio[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+        }
         else
         {
             owl::common::vec3f ltc_color = ltcDirectLighingBaseline(si, rng);
@@ -134,9 +134,10 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             color = ltc_color;
             
             optixLaunchParams.ltc_buffer[fbOfs] = make_float4(ltc_color.x, ltc_color.y, ltc_color.z, 1.f);
-            optixLaunchParams.stoDirectRatio[fbOfs] = make_float4(colors.colors[0].x, colors.colors[0].y, colors.colors[0].z, 1.f);
-            optixLaunchParams.stoNoVisRatio[fbOfs] = make_float4(colors.colors[1].x, colors.colors[1].y, colors.colors[1].z, 1.f);
-            
+            float color_direct = (colors.colors[0].x + colors.colors[0].y + colors.colors[0].z) / 3.f;
+            float color_noVis = (colors.colors[1].x + colors.colors[1].y + colors.colors[1].z) / 3.f;
+            optixLaunchParams.stoDirectRatio[fbOfs] = make_float4(color_direct, color_direct, color_direct, 1.f);
+            optixLaunchParams.stoNoVisRatio[fbOfs] = make_float4(color_noVis, color_noVis, color_noVis, 1.f);
         }
     }
     else if (optixLaunchParams.rendererType == PATH)
@@ -144,7 +145,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         if (si.isLight)
             color = si.emit;
         else
-           color = estimatePathTracing(si, rng, 1);
+           color = estimatePathTracing(si, rng, 2);
     }
     else {
         color = owl::common::vec3f(1., 0., 0.);
@@ -154,6 +155,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         color = color + owl::common::vec3f(optixLaunchParams.accumBuffer[fbOfs].x, optixLaunchParams.accumBuffer[fbOfs].y,
             optixLaunchParams.accumBuffer[fbOfs].z);
     optixLaunchParams.accumBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+    optixLaunchParams.albedo[fbOfs] = make_float4(si.diffuse.x, si.diffuse.y, si.diffuse.z, 1.f);
+    optixLaunchParams.normal[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
 
     color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
 
