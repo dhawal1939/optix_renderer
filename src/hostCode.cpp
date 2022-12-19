@@ -33,7 +33,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    owl::common::vec2i resolution(1024, 1024);
+    owl::common::vec2i resolution(1920/2, 1080/2);
     printf("%d %d reso\n", resolution.x, resolution.y);
 
     //std::string savePath = "C:/Users/dhawals/repos/optix_renderer/mask.png";

@@ -122,6 +122,7 @@ struct Viewer :public owl::viewer::OWLViewer
 
     // Random controls
     float lerp = 0.5f;
+    int cameraPos = 0.f;
 
 
     void denoise(const void* to_denoise);
@@ -572,6 +573,13 @@ void Viewer::cameraChanged()
     this->sbtDirty = true;
 
     this->denoise_setup();
+
+    this->cameraPos++;
+
+    //std::string fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/albedo_path/" + std::to_string(this->cameraPos);
+    //FILE *fp = fopen(fileName.c_str(), "wb");
+    //savebuffer(fp, &this->albedo, 1);
+
 }
 
 void Viewer::drawUI()

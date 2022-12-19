@@ -43,9 +43,9 @@ __inline__ __host__
 bool CHECK_IF_LTC(RendererType t)
 {
 	switch (t) {
-	case LTC_BASELINE:
+	/*case LTC_BASELINE:
 	case RATIO:
-		return true;
+		return true;*/
 	default:
 		return false;
 	}
