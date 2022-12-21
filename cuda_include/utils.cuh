@@ -1,6 +1,7 @@
 #pragma once
 #include <common.h>
 #include <optix.h>
+#include <cmath>
 #include <optix_device.h>
 #include <cuda_runtime.h>
 #include <owl/common/math/vec.h>
@@ -138,6 +139,23 @@ void matrixInverse(owl::common::vec3f m[3], owl::common::vec3f minv[3]) {
 
 
 __device__
+void matrixTranspose(owl::common::vec3f m[3], owl::common::vec3f mTrans[3]) {
+    mTrans[0] = m[0];
+    mTrans[1] = m[1];
+    mTrans[2] = m[2];
+
+    mTrans[1].x = m[0].y;
+    mTrans[2].x = m[0].z;
+
+    mTrans[0].y = m[1].x;
+    mTrans[2].y = m[1].z;
+
+    mTrans[0].z = m[2].x;
+    mTrans[1].z = m[2].y;
+}
+
+
+__device__
 owl::common::vec3f getPerpendicularVector(owl::common::vec3f _vec)
 {
     owl::common::vec3f x = owl::common::dot(_vec, owl::common::vec3f(0.f, 0.f, 1.f)) < 
@@ -159,8 +177,8 @@ void orthonormalBasis(owl::common::vec3f n, owl::common::vec3f mat[3], owl::comm
     {
         float a = 1. / (1. + n.z);
         float b = -n.x * n.y * a;
-        c1 = normalize(owl::common::vec3f(1. - n.x * n.x * a, b, -n.x));
-        c2 = normalize(owl::common::vec3f(b, 1. - n.y * n.y * a, -n.y));
+        c1 = owl::common::normalize(owl::common::vec3f(1. - n.x * n.x * a, b, -n.x));
+        c2 = owl::common::normalize(owl::common::vec3f(b, 1. - n.y * n.y * a, -n.y));
     }
     c3 = n;
 
@@ -168,8 +186,9 @@ void orthonormalBasis(owl::common::vec3f n, owl::common::vec3f mat[3], owl::comm
     mat[1] = c2;
     mat[2] = c3;
 
-    matrixInverse(mat, invmat);
+    matrixTranspose(mat, invmat);
 }
+
 
 __device__
 owl::common::vec3f samplePointOnTriangle(owl::common::vec3f v1, owl::common::vec3f v2, owl::common::vec3f v3,

@@ -74,29 +74,21 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
 
     SurfaceInteraction si;
     owl::traceRay(optixLaunchParams.world, ray, si);
-    // Out going direction pointing toward the pixel location
-    si.wo = owl::normalize(optixLaunchParams.camera.pos - si.p);
-    // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
-    orthonormalBasis(si.n_geom, si.to_local, si.to_world);
 
-    // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
-    si.wo_local = normalize(apply_mat(si.to_local, si.wo));
-
-
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    struct triColor colors;
-    colors.colors[0] = owl::common::vec3f(0.f);
-    colors.colors[1] = owl::common::vec3f(0.f);
-    // wo calculation
     {
-        // Out going direction pointing toward the pixel location
-        si.wo = owl::normalize(optixLaunchParams.camera.pos - si.p);
+        // Out going direction pointing towards the pixel location
+        si.wo = owl::normalize(ray.origin - si.p);
         // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
         orthonormalBasis(si.n_geom, si.to_local, si.to_world);
 
         // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
         si.wo_local = normalize(apply_mat(si.to_local, si.wo));
     }
+
+    owl::common::vec3f color(0.f, 0.f, 0.f);
+    struct triColor colors;
+    colors.colors[0] = owl::common::vec3f(0.f);
+    colors.colors[1] = owl::common::vec3f(0.f);
     if (si.hit == false)
     {
         color = si.diffuse;
@@ -155,7 +147,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         if (si.isLight)
             color = si.emit;
         else
-           color = estimatePathTracing(si, rng, 2);
+           color = estimatePathTracing(si, rng, ray, 2);
 
     }
     else {

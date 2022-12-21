@@ -51,11 +51,11 @@ struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max
             float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, light_si.n_geom)); // check if -L is required or just L works
 
             owl::common::vec3f H = normalize(L + V);
-            float brdfPdf = get_brdf_pdf(current_si.alpha, V, current_si.n_geom, H, L); // brdf pdf of current point
+            float brdfPdf = 0.; // get_brdf_pdf(current_si.alpha, V, current_si.n_geom, H, L); // brdf pdf of current point
             float metalness = 0.5f, reflectance = 0.5f;
             owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
                 current_si.diffuse * metalness;
-            owl::common::vec3f brdf = evaluate_brdf(V, current_si.n_geom, L, owl::common::vec3f(1.), current_si.alpha, owl::common::vec3f(1.)); // brdf of current point
+            owl::common::vec3f brdf = owl::common::vec3f(0.);//evaluate_brdf(V, current_si.n_geom, L, owl::common::vec3f(1.), current_si.alpha, owl::common::vec3f(1.)); // brdf of current point
             float misW = balanceHeuristic(1, lightPdfW, 1, brdfPdf);
             if (light_si.isLight) {
                 color += misW * light_si.emit * tp * brdf * clampDot(current_si.n_geom, L, false) / lightPdfW;

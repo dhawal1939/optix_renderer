@@ -1,7 +1,7 @@
 #pragma once
 #include <utils.cuh>
 #include <common.cuh>
-#include <ggx_ndf.cuh>
+#include <material.cuh>
 #include <lcg_random.cuh>
 #include <optix_device.h>
 #include <owl/owl_device.h>
@@ -33,33 +33,19 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
     si.uv.x = owl::common::abs(fmodf(si.uv.x, 1.));
     si.uv.y = owl::common::abs(fmodf(si.uv.y, 1.));
 
+    // geometric normal 
+    si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
+    si.diffuse = self.diffuse;
+    if (self.hasDiffuseTexture)
+    {   
+        owl::common::vec4f diffuse = tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
+        si.diffuse = owl::common::vec3f(diffuse.x, diffuse.y, diffuse.z);
+    }
+    si.alpha = self.alpha;
+    si.alpha = owl::clamp(si.alpha, 0.01f, 1.f);
 
     si.emit = self.emit;
     si.isLight = self.isLight;
-    // geometric normal 
-    si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
-    // if bump map exists
-   /* if (self.hasNormalTexture)
-    {
-       float4 normal_vals= tex2D<float4>(self.normal_texture, si.uv.x, si.uv.y);
-       si.n_shad = owl::common::vec3f(normal_vals.x, normal_vals.y, normal_vals.z);
-       si.n_shad = owl::normalize(si.n_shad);
-    }*/
-    // axix independet prop
-    si.diffuse = self.diffuse;
-    if (self.hasDiffuseTexture)
-    {
-        float4 diffuse_values = tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
-        si.diffuse = owl::common::vec3f(diffuse_values.x, diffuse_values.y, diffuse_values.z);
-    }
-    si.alpha = 1 - self.alpha;
-    if (self.hasAlphaTexture)
-    {
-        float4 alpha_values = tex2D<float4>(self.alpha_texture, si.uv.x, si.uv.y);
-        si.alpha = owl::common::max(alpha_values.x, owl::common::max(alpha_values.y, alpha_values.z));
-        //si.alpha = owl::common::length(owl::common::vec3f(alpha_values.x, alpha_values.y, alpha_values.z));
-    }
-    si.alpha = clamp(si.alpha, 0.01f, 1.f);
 }
 
 OPTIX_MISS_PROGRAM(miss)()
@@ -69,5 +55,6 @@ OPTIX_MISS_PROGRAM(miss)()
 
     SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
     si.hit = false;
+    si.isLight = false;
     si.diffuse = self.const_color;
 }
