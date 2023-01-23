@@ -219,7 +219,8 @@ namespace osc {
                         materials[materialID].bump_texname,
                         modelDir);
 
-                    mesh->emit = (const owl::common::vec3f&)materials[materialID].diffuse;
+                    mesh->emit = (const owl::common::vec3f&)materials[materialID].emission;
+                    mesh->materialID = materialID + 1;
                 }
 
                 if (mesh->vertex.empty()) {

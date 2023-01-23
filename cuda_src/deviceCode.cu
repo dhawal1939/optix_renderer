@@ -106,7 +106,9 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         color = si.n_geom;
     else if (optixLaunchParams.rendererType == SHADE_NORMALS)
         color = si.n_shad;
-    // Direct lighting with LTC
+    else if (optixLaunchParams.rendererType == MATERIAL_ID)
+        color = owl::vec3f(si.materialID);
+   // Direct lighting with LTC
     else if (optixLaunchParams.rendererType == LTC_BASELINE) {
         if (si.isLight)
             color = si.emit;

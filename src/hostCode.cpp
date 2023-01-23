@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 
     std::string currentScene;
 
-    std::string defaultScene = "C:/Users/dhawals/repos/old_working/optix_renderer/scenes/scene_configs/test_scene3.json";
+    std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/rgb_test_scene.json";
 
 
     /*if (argc == 2)
@@ -36,8 +36,7 @@ int main(int argc, char** argv)
     owl::common::vec2i resolution(1920, 1080);
     printf("%d %d reso\n", resolution.x, resolution.y);
 
-    //std::string savePath = "C:/Users/dhawals/repos/optix_renderer/mask.png";
-    Viewer win(scene, resolution, PATH);
+    Viewer win(scene, resolution, MATERIAL_ID);
     printf("framebuffer reso %d %d\n", win.getScreenSize().x, win.getScreenSize().y);
 
     //win.to_save_file = savePath;

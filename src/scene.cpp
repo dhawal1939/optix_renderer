@@ -7,6 +7,7 @@ void Scene::syncLights()
     for (auto light : this->triLights->meshes)
     {
         light->isLight = true;
+        light->materialID = 0; // set material id of light to be 0
         this->model->meshes.push_back(light);
     }
 }

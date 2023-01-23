@@ -21,6 +21,7 @@ enum RendererType {
 	SHADE_NORMALS,
 	POSITION,
 	MASK,
+	MATERIAL_ID,
 	LTC_BASELINE,
 	RATIO,
 	PATH,
@@ -33,7 +34,8 @@ const char* rendererNames[NUM_RENDERER_TYPES] = {
 													"Normals",
 													"Shading Normals"
 													"Position",
-													"MASK",
+													"Mask",
+													"Material ID",
 													"LTC Baseline",
 													"RATIO",
 													"PATH"
@@ -122,6 +124,7 @@ struct TriangleMeshData {
 
 	bool isLight;
 	owl::common::vec3f emit;
+	unsigned int materialID;
 
 	owl::common::vec3f diffuse;
 	bool hasDiffuseTexture;
@@ -153,6 +156,8 @@ struct SurfaceInteraction {
 	owl::common::vec2f uv = owl::common::vec2f(0.f);
 	owl::common::vec3f wo = owl::common::vec3f(0.f), wi = owl::common::vec3f(0.f);
 	owl::common::vec3f wo_local = owl::common::vec3f(0.f), wi_local = owl::common::vec3f(0.f);
+
+	unsigned int materialID;
 
 	owl::common::vec3f n_geom = owl::common::vec3f(0.f), n_shad = owl::common::vec3f(0.f);
 

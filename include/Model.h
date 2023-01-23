@@ -42,6 +42,7 @@ namespace osc
         owl::common::vec3f normal_map_vec;
         int normalTextureID{ -1 };
 
+        unsigned int materialID;
         owl::common::vec3f emit;
 
         // Is light

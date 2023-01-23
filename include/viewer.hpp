@@ -322,6 +322,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
 
             {"isLight", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, isLight)},
             {"emit", OWL_FLOAT3, OWL_OFFSETOF(TriangleMeshData, emit)},
+            {"materialID", OWL_UINT, OWL_OFFSETOF(TriangleMeshData, materialID)},
 
             {"diffuse", OWL_FLOAT3, OWL_OFFSETOF(TriangleMeshData, diffuse)},
             {"diffuse_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, diffuse_texture)},
@@ -434,6 +435,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         owlGeomSetBuffer(triangleGeom, "normal", normalBuffer);
         owlGeomSetBuffer(triangleGeom, "index", indexBuffer);
         owlGeomSetBuffer(triangleGeom, "texCoord", texCoordBuffer);
+        owlGeomSet1ui(triangleGeom, "materialID", mesh->materialID);
 
         // ====================================================
         // Build the BLAS (GAS)

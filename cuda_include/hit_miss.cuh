@@ -18,6 +18,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
 
     SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
     si.hit = true;
+    si.materialID = self.materialID;
 
     // area of triangle
     owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
