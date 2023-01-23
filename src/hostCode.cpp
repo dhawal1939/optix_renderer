@@ -14,15 +14,7 @@ int main(int argc, char** argv)
     std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/rgb_test_scene.json";
 
 
-    /*if (argc == 2)
-        currentScene = std::string(argv[1]);
-    else*/
-        currentScene = defaultScene;
-
-    /*if (argc >= 3)
-    {
-        isInteractive = atoi(argv[2]);
-    }*/
+    currentScene = defaultScene;
 
     LOG("Loading scene " + currentScene);
 
@@ -33,10 +25,10 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    owl::common::vec2i resolution(1920, 1080);
+    owl::common::vec2i resolution(1024, 1024);
     printf("%d %d reso\n", resolution.x, resolution.y);
 
-    Viewer win(scene, resolution, MATERIAL_ID);
+    Viewer win(scene, resolution, PATH);
     printf("framebuffer reso %d %d\n", win.getScreenSize().x, win.getScreenSize().y);
 
     //win.to_save_file = savePath;

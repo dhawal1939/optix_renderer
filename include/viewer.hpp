@@ -650,39 +650,47 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
         {
 
             //this->denoise(owlBufferGetPointer(this->stoDirectRatio, 0));
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/stoDirect.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/stoDirect.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->stoDirectRatio, 1);
 
             //this->denoise(owlBufferGetPointer(this->stoNoVisRatio, 0));
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/stoNoVis.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/stoNoVis.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->stoNoVisRatio, 1);
 
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/ltc.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/ltc.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->ltc_buffer, 1);
 
 
 
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/normal.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normal.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->normal, 1);
 
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/albedo.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/albedo.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->albedo, 1);
         }
         if (this->rendererType == PATH)
         {
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/path.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/path.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->accumBuffer, this->accumId);
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normal.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->normal, 1);
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/albedo.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->albedo, 1);
         }
 
         if (this->rendererType == LTC_BASELINE)
         {
-            fileName = "C:/Users/dhawals/repos/old_working/optix_renderer/saves/ltc_baseline.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/ltc_baseline.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->accumBuffer, 1);
         }

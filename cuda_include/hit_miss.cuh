@@ -57,5 +57,7 @@ OPTIX_MISS_PROGRAM(miss)()
     SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
     si.hit = false;
     si.isLight = false;
+    si.materialID = 0;
+    si.n_geom = owl::vec3f(0.);
     si.diffuse = self.const_color;
 }
