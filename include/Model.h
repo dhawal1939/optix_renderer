@@ -28,7 +28,7 @@ namespace osc
     struct TriangleMesh
     {
         std::vector<owl::common::vec3f> vertex;
-        std::vector<owl::common::vec3f> normal;
+        std::vector<owl::common::vec3f> normalBuffer;
         std::vector<owl::common::vec2f> texcoord;
         std::vector<owl::common::vec3i> index;
 

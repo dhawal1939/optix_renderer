@@ -160,8 +160,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         color = color + owl::common::vec3f(optixLaunchParams.accumBuffer[fbOfs].x, optixLaunchParams.accumBuffer[fbOfs].y,
             optixLaunchParams.accumBuffer[fbOfs].z);
     optixLaunchParams.accumBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-    optixLaunchParams.albedo[fbOfs] = make_float4(si.materialID, si.materialID, si.materialID, 1.f);
-    optixLaunchParams.normal[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
+    optixLaunchParams.materialIDBuffer[fbOfs] = make_float4(si.materialID, si.materialID, si.materialID, 1.f);
+    optixLaunchParams.normalBuffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
 
     color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
 

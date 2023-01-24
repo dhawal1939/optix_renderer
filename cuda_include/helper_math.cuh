@@ -1420,7 +1420,7 @@ inline __host__ __device__ int4 abs(int4 v)
 
 ////////////////////////////////////////////////////////////////////////////////
 // reflect
-// - returns reflection of incident ray I around surface normal N
+// - returns reflection of incident ray I around surface normalBuffer N
 // - N should be normalized, reflected vector's length is equal to length of I
 ////////////////////////////////////////////////////////////////////////////////
 

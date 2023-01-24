@@ -54,7 +54,7 @@ owl::common::vec3f sample_direction(owl::common::vec3f& wo, float u1, float u2, 
 
 	computeLobeProbabilities(wo, pDiffuse, pSpecular, base_colors, metalness);
 	owl::common::vec3f wi;
-
+	pDiffuse = 1.f;
 	if (u1 < pDiffuse)
 	{
 		u1 = remap(u1,

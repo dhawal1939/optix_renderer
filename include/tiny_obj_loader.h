@@ -218,7 +218,7 @@ namespace tinyobj
 		std::string metallic_texname;  // map_Pm
 		std::string sheen_texname;	   // map_Ps
 		std::string emissive_texname;  // map_Ke
-		std::string normal_texname;	   // norm. For normal mapping.
+		std::string normal_texname;	   // norm. For normalBuffer mapping.
 
 		texture_option_t roughness_texopt;
 		texture_option_t metallic_texopt;
@@ -335,7 +335,7 @@ namespace tinyobj
 		std::vector<std::string> stringValues;
 	} tag_t;
 
-	// Index struct to support different indices for vtx/normal/texcoord.
+	// Index struct to support different indices for vtx/normalBuffer/texcoord.
 	// -1 means not used.
 	typedef struct
 	{
@@ -680,7 +680,7 @@ namespace tinyobj
 	struct __line_t
 	{
 		// l v1/vt1 v2/vt2 ...
-		// In the specification, line primitrive does not have normal index, but
+		// In the specification, line primitrive does not have normalBuffer index, but
 		// TinyObjLoader allow it
 		std::vector<vertex_index_t> vertex_indices;
 	};
@@ -689,7 +689,7 @@ namespace tinyobj
 	struct __points_t
 	{
 		// p v1 v2 ...
-		// In the specification, point primitrive does not have normal index and
+		// In the specification, point primitrive does not have normalBuffer index and
 		// texture coord index, but TinyObjLoader allow it.
 		std::vector<vertex_index_t> vertex_indices;
 	};
@@ -2236,7 +2236,7 @@ namespace tinyobj
 				continue;
 			}
 
-			// PBR: normal map texture
+			// PBR: normalBuffer map texture
 			if ((0 == strncmp(token, "norm", 4)) && IS_SPACE(token[4]))
 			{
 				token += 5;
@@ -2460,7 +2460,7 @@ namespace tinyobj
 				continue;
 			}
 
-			// normal
+			// normalBuffer
 			if (token[0] == 'v' && token[1] == 'n' && IS_SPACE((token[2])))
 			{
 				token += 3;
@@ -2909,7 +2909,7 @@ namespace tinyobj
 			if (warn)
 			{
 				std::stringstream ss;
-				ss << "Vertex normal indices out of bounds (line " << line_num << ".)\n"
+				ss << "Vertex normalBuffer indices out of bounds (line " << line_num << ".)\n"
 				   << std::endl;
 				(*warn) += ss.str();
 			}
@@ -3019,7 +3019,7 @@ namespace tinyobj
 				continue;
 			}
 
-			// normal
+			// normalBuffer
 			if (token[0] == 'v' && token[1] == 'n' && IS_SPACE((token[2])))
 			{
 				token += 3;
