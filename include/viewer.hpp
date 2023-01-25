@@ -93,11 +93,11 @@ struct Viewer :public owl::viewer::OWLViewer
     RendererType rendererType;
     bool sbtDirty = true;
 
-    OWLBuffer accumBuffer{ 0 };
+    OWLBuffer accumScreenBuffer{ 0 };
     OWLBuffer ltc_buffer{ 0 };
-    OWLBuffer stoDirectRatio{ 0 };
-    OWLBuffer stoNoVisRatio{ 0 };
-    OWLBuffer materialIDBuffer{ 0 };
+    OWLBuffer stoDirectRatioBuffer{ 0 };
+    OWLBuffer stoNoVisRatioScreenBuffer{ 0 };
+    OWLBuffer materialIDScreenBuffer{ 0 };
     OWLBuffer normalScreenBuffer{ 0 };
 
 
@@ -169,21 +169,21 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     this->ltc_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(this->ltc_buffer, this->getWindowSize().x * this->getWindowSize().y);
     
-    this->stoDirectRatio = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->stoDirectRatio, this->getWindowSize().x * this->getWindowSize().y);
+    this->stoDirectRatioBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->stoDirectRatioBuffer, this->getWindowSize().x * this->getWindowSize().y);
     
-    this->stoNoVisRatio = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->stoNoVisRatio, this->getWindowSize().x * this->getWindowSize().y);
+    this->stoNoVisRatioScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->stoNoVisRatioScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
 
 
     this->normalScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(this->normalScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
     
-    this->materialIDBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->materialIDBuffer, this->getWindowSize().x * this->getWindowSize().y);
+    this->materialIDScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->materialIDScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
 
-    this->accumBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->accumBuffer, this->getWindowSize().x * this->getWindowSize().y);
+    this->accumScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->accumScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
 
 
     owlContextSetRayTypeCount(context, 2);
@@ -236,13 +236,13 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         {"meshLights", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, meshLights)},
         {"numMeshLights", OWL_INT, OWL_OFFSETOF(LaunchParams, numMeshLights)},
         // All other parameters
-        {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
+        {"accumScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumScreenBuffer)},
         
         {"ltc_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, ltc_buffer)},
-        {"stoDirectRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoDirectRatio)},
-        {"stoNoVisRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoNoVisRatio)},
+        {"stoDirectRatioBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoDirectRatioBuffer)},
+        {"stoNoVisRatioScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoNoVisRatioScreenBuffer)},
 
-        {"materialIDBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, materialIDBuffer)},
+        {"materialIDScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, materialIDScreenBuffer)},
         {"normalScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, normalScreenBuffer)},
 
         {"accumId", OWL_INT, OWL_OFFSETOF(LaunchParams, accumId)},
@@ -291,14 +291,14 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
 
     // Upload accumulation buffer and ID
     owlParamsSet1i(this->launchParams, "accumId", this->accumId);
-    owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
+    owlParamsSetBuffer(this->launchParams, "accumScreenBuffer", this->accumScreenBuffer);
 
     owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
-    owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
-    owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatioBuffer", this->stoDirectRatioBuffer);
+    owlParamsSetBuffer(this->launchParams, "stoNoVisRatioScreenBuffer", this->stoNoVisRatioScreenBuffer);
 
     owlParamsSetBuffer(this->launchParams, "normalScreenBuffer", this->normalScreenBuffer);
-    owlParamsSetBuffer(this->launchParams, "materialIDBuffer", this->materialIDBuffer);
+    owlParamsSetBuffer(this->launchParams, "materialIDScreenBuffer", this->materialIDScreenBuffer);
 
     // ====================================================
     // Scene setup (scene geometry and materials)
@@ -511,21 +511,21 @@ void Viewer::resize(const owl::common::vec2i& newSize)
     OWLViewer::resize(newSize);
 
     // Resize accumulation buffer, and set to launch params
-    owlBufferResize(this->stoDirectRatio, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
+    owlBufferResize(this->stoDirectRatioBuffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatioBuffer", this->stoDirectRatioBuffer);
     
     owlBufferResize(this->ltc_buffer, newSize.x * newSize.y);
     owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
 
-    owlBufferResize(this->accumBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "accumBuffer", this->accumBuffer);
+    owlBufferResize(this->accumScreenBuffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "accumScreenBuffer", this->accumScreenBuffer);
 
     
-    owlBufferResize(this->stoNoVisRatio, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
+    owlBufferResize(this->stoNoVisRatioScreenBuffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "stoNoVisRatioScreenBuffer", this->stoNoVisRatioScreenBuffer);
 
-    owlBufferResize(this->materialIDBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "materialIDBuffer", this->materialIDBuffer);
+    owlBufferResize(this->materialIDScreenBuffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "materialIDScreenBuffer", this->materialIDScreenBuffer);
 
     owlBufferResize(this->normalScreenBuffer, newSize.x * newSize.y);
     owlParamsSetBuffer(this->launchParams, "normalScreenBuffer", this->normalScreenBuffer);
@@ -644,15 +644,15 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
         if (this->rendererType == RATIO)
         {
 
-            //this->denoise(owlBufferGetPointer(this->stoDirectRatio, 0));
+            //this->denoise(owlBufferGetPointer(this->stoDirectRatioBuffer, 0));
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/stoDirect.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->stoDirectRatio, 1);
+            savebuffer(fp, &this->stoDirectRatioBuffer, 1);
 
-            //this->denoise(owlBufferGetPointer(this->stoNoVisRatio, 0));
+            //this->denoise(owlBufferGetPointer(this->stoNoVisRatioScreenBuffer, 0));
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/stoNoVis.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->stoNoVisRatio, 1);
+            savebuffer(fp, &this->stoNoVisRatioScreenBuffer, 1);
 
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/ltc.btc";
             fp = fopen(fileName.c_str(), "wb");
@@ -664,30 +664,30 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->normalScreenBuffer, 1);
 
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDBuffer.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDScreenBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->materialIDBuffer, 1);
+            savebuffer(fp, &this->materialIDScreenBuffer, 1);
         }
         if (this->rendererType == PATH)
         {
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/path.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->accumBuffer, this->accumId);
+            savebuffer(fp, &this->accumScreenBuffer, this->accumId);
 
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalScreenBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->normalScreenBuffer, 1);
 
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDBuffer.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDScreenBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->materialIDBuffer, 1);
+            savebuffer(fp, &this->materialIDScreenBuffer, 1);
         }
 
         if (this->rendererType == LTC_BASELINE)
         {
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/ltc_baseline.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->accumBuffer, 1);
+            savebuffer(fp, &this->accumScreenBuffer, 1);
         }
     }
 }
@@ -801,7 +801,7 @@ void Viewer::denoise(const void* to_denoise_ptr)
     //inputLayer[0].format = OPTIX_PIXEL_FORMAT_FLOAT4;
 
     ///*
-    //inputLayer[1].data = (CUdeviceptr)this->materialIDBuffer;
+    //inputLayer[1].data = (CUdeviceptr)this->materialIDScreenBuffer;
     //inputLayer[1].width = this->fbSize.x;
     //inputLayer[1].height = this->fbSize.y;
     //inputLayer[1].rowStrideInBytes = this->fbSize.x * sizeof(float4);
@@ -825,7 +825,7 @@ void Viewer::denoise(const void* to_denoise_ptr)
     //outputLayer.format = OPTIX_PIXEL_FORMAT_FLOAT4;
 
     //OptixDenoiserGuideLayer denoiserGuideLayer = {};
-    ///*denoiserGuideLayer.materialIDBuffer = inputLayer[1];
+    ///*denoiserGuideLayer.materialIDScreenBuffer = inputLayer[1];
     //denoiserGuideLayer.normalBuffer = inputLayer[2];*/
 
     //OptixDenoiserLayer denoiserLayer = {};

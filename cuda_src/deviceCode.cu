@@ -119,8 +119,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         {
             color = si.emit;
             optixLaunchParams.ltc_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-            optixLaunchParams.stoDirectRatio[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-            optixLaunchParams.stoNoVisRatio[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.stoDirectRatioBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.stoNoVisRatioScreenBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
         }
         else
         {
@@ -139,8 +139,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             optixLaunchParams.ltc_buffer[fbOfs] = make_float4(ltc_color.x, ltc_color.y, ltc_color.z, 1.f);
             float color_direct = (colors.colors[0].x + colors.colors[0].y + colors.colors[0].z) / 3.f;
             float color_noVis = (colors.colors[1].x + colors.colors[1].y + colors.colors[1].z) / 3.f;
-            optixLaunchParams.stoDirectRatio[fbOfs] = make_float4(color_direct, color_direct, color_direct, 1.f);
-            optixLaunchParams.stoNoVisRatio[fbOfs] = make_float4(color_noVis, color_noVis, color_noVis, 1.f);
+            optixLaunchParams.stoDirectRatioBuffer[fbOfs] = make_float4(color_direct, color_direct, color_direct, 1.f);
+            optixLaunchParams.stoNoVisRatioScreenBuffer[fbOfs] = make_float4(color_noVis, color_noVis, color_noVis, 1.f);
         }
     }
     else if (optixLaunchParams.rendererType == PATH)
@@ -156,10 +156,10 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     }
   
     if (optixLaunchParams.accumId > 0)
-        color = color + owl::common::vec3f(optixLaunchParams.accumBuffer[fbOfs].x, optixLaunchParams.accumBuffer[fbOfs].y,
-            optixLaunchParams.accumBuffer[fbOfs].z);
-    optixLaunchParams.accumBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-    optixLaunchParams.materialIDBuffer[fbOfs] = make_float4(si.materialID, si.materialID, si.materialID, 1.f);
+        color = color + owl::common::vec3f(optixLaunchParams.accumScreenBuffer[fbOfs].x, optixLaunchParams.accumScreenBuffer[fbOfs].y,
+            optixLaunchParams.accumScreenBuffer[fbOfs].z);
+    optixLaunchParams.accumScreenBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+    optixLaunchParams.materialIDScreenBuffer[fbOfs] = make_float4(si.materialID, si.materialID, si.materialID, 1.f);
     optixLaunchParams.normalScreenBuffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
 
     color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;

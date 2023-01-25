@@ -81,12 +81,12 @@ struct LaunchParams {
 	bool clicked;
 	owl::common::vec2i pixelId;
 
-	float4* accumBuffer;
+	float4* accumScreenBuffer;
 	float4* ltc_buffer;
-	float4* stoDirectRatio;
-	float4* stoNoVisRatio;
+	float4* stoDirectRatioBuffer;
+	float4* stoNoVisRatioScreenBuffer;
 	float4* normalScreenBuffer;
-	float4* materialIDBuffer;
+	float4* materialIDScreenBuffer;
 	int accumId;
 
 	int rendererType;
