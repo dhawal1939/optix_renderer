@@ -35,7 +35,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
     si.uv.y = owl::common::abs(fmodf(si.uv.y, 1.));
 
     // geometric normalScreenBuffer
-    si.n_geom = normalize(barycentricInterpolate(self.normalScreenBuffer, primitiveIndices));
+    si.n_geom = normalize(barycentricInterpolate(self.normal, primitiveIndices));
     si.diffuse = self.diffuse;
     if (self.hasDiffuseTexture)
     {   

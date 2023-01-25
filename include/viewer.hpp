@@ -100,7 +100,6 @@ struct Viewer :public owl::viewer::OWLViewer
     OWLBuffer materialIDScreenBuffer{ 0 };
     OWLBuffer normalScreenBuffer{ 0 };
 
-
     int accumId = 0;
 
     OWLRayGen rayGen{ 0 };
@@ -209,7 +208,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
             triLight.v3 = light->vertex[index.z];
 
             triLight.cg = (triLight.v1 + triLight.v2 + triLight.v3) / 3.f;
-            triLight.normalScreenBuffer = normalize(light->normal[index.x] + light->normal[index.y] + light->normal[index.z]);
+            triLight.normal = normalize(light->normal[index.x] + light->normal[index.y] + light->normal[index.z]);
             triLight.area = 0.5f * length(cross(triLight.v1 - triLight.v2, triLight.v3 - triLight.v2));
 
             triLight.emit = light->emit;
@@ -318,7 +317,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         // TriangleMeshData is a CUDA struct. This declares variables to be set on the host (var names given as 1st entry)
         OWLVarDecl triangleGeomVars[] = {
             {"vertex", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, vertex)},
-            {"normalScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, normalScreenBuffer)},
+            {"normal", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, normal)},
             {"index", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, index)},
             {"texCoord", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, texCoord)},
 
@@ -432,7 +431,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         owlTrianglesSetIndices(triangleGeom, indexBufferObject, mesh->index.size(), sizeof(owl::common::vec3i), 0);
 
         owlGeomSetBuffer(triangleGeom, "vertex", vertexBufferObject);
-        owlGeomSetBuffer(triangleGeom, "normalScreenBuffer", normalBufferObject);
+        owlGeomSetBuffer(triangleGeom, "normal", normalBufferObject);
         owlGeomSetBuffer(triangleGeom, "index", indexBufferObject);
         owlGeomSetBuffer(triangleGeom, "texCoord", texCoordBufferObject);
         owlGeomSet1ui(triangleGeom, "materialID", mesh->materialID);
@@ -511,16 +510,17 @@ void Viewer::resize(const owl::common::vec2i& newSize)
     OWLViewer::resize(newSize);
 
     // Resize accumulation buffer, and set to launch params
-    owlBufferResize(this->stoDirectRatioBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "stoDirectRatioBuffer", this->stoDirectRatioBuffer);
     
-    owlBufferResize(this->ltc_buffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
 
     owlBufferResize(this->accumScreenBuffer, newSize.x * newSize.y);
     owlParamsSetBuffer(this->launchParams, "accumScreenBuffer", this->accumScreenBuffer);
 
+    owlBufferResize(this->ltc_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
     
+    owlBufferResize(this->stoDirectRatioBuffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "stoDirectRatioBuffer", this->stoDirectRatioBuffer);
+
     owlBufferResize(this->stoNoVisRatioScreenBuffer, newSize.x * newSize.y);
     owlParamsSetBuffer(this->launchParams, "stoNoVisRatioScreenBuffer", this->stoNoVisRatioScreenBuffer);
 

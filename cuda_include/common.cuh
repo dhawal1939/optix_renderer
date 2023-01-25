@@ -64,7 +64,7 @@ typedef owl::RayT<1, 2> ShadowRay;
 struct TriLight {
 	owl::common::vec3f v1, v2, v3;
 	owl::common::vec3f cg;
-	owl::common::vec3f normalScreenBuffer;
+	owl::common::vec3f normal;
 	owl::common::vec3f emit;
 
 	//float flux;
@@ -118,7 +118,7 @@ struct RayGenData {
 
 struct TriangleMeshData {
 	owl::common::vec3f* vertex;
-	owl::common::vec3f* normalScreenBuffer;
+	owl::common::vec3f* normal;
 	owl::common::vec3i* index;
 	owl::common::vec2f* texCoord;
 
