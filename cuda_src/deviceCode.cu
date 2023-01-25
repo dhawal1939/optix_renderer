@@ -80,7 +80,6 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         si.wo = owl::normalize(ray.origin - si.p);
         // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
         orthonormalBasis(si.n_geom, si.to_local, si.to_world);
-
         // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
         si.wo_local = normalize(apply_mat(si.to_local, si.wo));
     }
@@ -161,7 +160,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             optixLaunchParams.accumBuffer[fbOfs].z);
     optixLaunchParams.accumBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
     optixLaunchParams.materialIDBuffer[fbOfs] = make_float4(si.materialID, si.materialID, si.materialID, 1.f);
-    optixLaunchParams.normalBuffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
+    optixLaunchParams.normalScreenBuffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
 
     color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
 

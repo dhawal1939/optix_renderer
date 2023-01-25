@@ -52,7 +52,7 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 	owl::common::vec3f lv2 = triLight.v2;
 	owl::common::vec3f lv3 = triLight.v3;
 	owl::common::vec3f lemit = triLight.emit;
-	owl::common::vec3f lnormal = triLight.normalBuffer;
+	owl::common::vec3f lnormal = triLight.normalScreenBuffer;
 
 	// Move to origin and normalize
 	lv1 = owl::normalize(lv1 - si.p);

@@ -98,7 +98,7 @@ struct Viewer :public owl::viewer::OWLViewer
     OWLBuffer stoDirectRatio{ 0 };
     OWLBuffer stoNoVisRatio{ 0 };
     OWLBuffer materialIDBuffer{ 0 };
-    OWLBuffer normalBuffer{ 0 };
+    OWLBuffer normalScreenBuffer{ 0 };
 
 
     int accumId = 0;
@@ -176,8 +176,8 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     owlBufferResize(this->stoNoVisRatio, this->getWindowSize().x * this->getWindowSize().y);
 
 
-    this->normalBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->normalBuffer, this->getWindowSize().x * this->getWindowSize().y);
+    this->normalScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->normalScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
     
     this->materialIDBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(this->materialIDBuffer, this->getWindowSize().x * this->getWindowSize().y);
@@ -209,7 +209,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
             triLight.v3 = light->vertex[index.z];
 
             triLight.cg = (triLight.v1 + triLight.v2 + triLight.v3) / 3.f;
-            triLight.normalBuffer = normalize(light->normalBuffer[index.x] + light->normalBuffer[index.y] + light->normalBuffer[index.z]);
+            triLight.normalScreenBuffer = normalize(light->normal[index.x] + light->normal[index.y] + light->normal[index.z]);
             triLight.area = 0.5f * length(cross(triLight.v1 - triLight.v2, triLight.v3 - triLight.v2));
 
             triLight.emit = light->emit;
@@ -243,7 +243,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         {"stoNoVisRatio", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoNoVisRatio)},
 
         {"materialIDBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, materialIDBuffer)},
-        {"normalBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, normalBuffer)},
+        {"normalScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, normalScreenBuffer)},
 
         {"accumId", OWL_INT, OWL_OFFSETOF(LaunchParams, accumId)},
         {"rendererType", OWL_INT, OWL_OFFSETOF(LaunchParams, rendererType)},
@@ -297,7 +297,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     owlParamsSetBuffer(this->launchParams, "stoDirectRatio", this->stoDirectRatio);
     owlParamsSetBuffer(this->launchParams, "stoNoVisRatio", this->stoNoVisRatio);
 
-    owlParamsSetBuffer(this->launchParams, "normalBuffer", this->normalBuffer);
+    owlParamsSetBuffer(this->launchParams, "normalScreenBuffer", this->normalScreenBuffer);
     owlParamsSetBuffer(this->launchParams, "materialIDBuffer", this->materialIDBuffer);
 
     // ====================================================
@@ -318,7 +318,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         // TriangleMeshData is a CUDA struct. This declares variables to be set on the host (var names given as 1st entry)
         OWLVarDecl triangleGeomVars[] = {
             {"vertex", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, vertex)},
-            {"normalBuffer", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, normalBuffer)},
+            {"normalScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, normalScreenBuffer)},
             {"index", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, index)},
             {"texCoord", OWL_BUFPTR, OWL_OFFSETOF(TriangleMeshData, texCoord)},
 
@@ -334,7 +334,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
             {"alpha_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, alpha_texture)},
             {"hasAlphaTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, hasAlphaTexture)},
             
-            {"normalBuffer", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, normal_map)},
+            {"normalScreenBuffer", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, normal_map)},
             {"normal_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, hasNormalTexture)},
             {"hasNormalTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, normal_texture)},
             {nullptr}
@@ -363,10 +363,10 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         // ====================================================
 
         // Create CUDA buffers from mesh vertices, indices and UV coordinates
-        OWLBuffer vertexBuffer = owlDeviceBufferCreate(context, OWL_FLOAT3, mesh->vertex.size(), mesh->vertex.data());
-        OWLBuffer normalBuffer = owlDeviceBufferCreate(context, OWL_FLOAT3, mesh->normalBuffer.size(), mesh->normalBuffer.data());
-        OWLBuffer indexBuffer = owlDeviceBufferCreate(context, OWL_INT3, mesh->index.size(), mesh->index.data());
-        OWLBuffer texCoordBuffer = owlDeviceBufferCreate(context, OWL_FLOAT2, mesh->texcoord.size(), mesh->texcoord.data());
+        OWLBuffer vertexBufferObject = owlDeviceBufferCreate(context, OWL_FLOAT3, mesh->vertex.size(), mesh->vertex.data());
+        OWLBuffer normalBufferObject = owlDeviceBufferCreate(context, OWL_FLOAT3, mesh->normal.size(), mesh->normal.data());
+        OWLBuffer indexBufferObject = owlDeviceBufferCreate(context, OWL_INT3, mesh->index.size(), mesh->index.data());
+        OWLBuffer texCoordBufferObject = owlDeviceBufferCreate(context, OWL_FLOAT2, mesh->texcoord.size(), mesh->texcoord.data());
 
         // Set emission value, and more importantly, if the current mesh is a light
         owlGeomSet1b(triangleGeom, "isLight", mesh->isLight);
@@ -428,15 +428,13 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         // ====================================================
 
         // Set vertices, indices and UV coords on the device
-        owlTrianglesSetVertices(triangleGeom, vertexBuffer,
-            mesh->vertex.size(), sizeof(owl::common::vec3f), 0);
-        owlTrianglesSetIndices(triangleGeom, indexBuffer,
-            mesh->index.size(), sizeof(owl::common::vec3i), 0);
+        owlTrianglesSetVertices(triangleGeom, vertexBufferObject, mesh->vertex.size(), sizeof(owl::common::vec3f), 0);
+        owlTrianglesSetIndices(triangleGeom, indexBufferObject, mesh->index.size(), sizeof(owl::common::vec3i), 0);
 
-        owlGeomSetBuffer(triangleGeom, "vertex", vertexBuffer);
-        owlGeomSetBuffer(triangleGeom, "normalBuffer", normalBuffer);
-        owlGeomSetBuffer(triangleGeom, "index", indexBuffer);
-        owlGeomSetBuffer(triangleGeom, "texCoord", texCoordBuffer);
+        owlGeomSetBuffer(triangleGeom, "vertex", vertexBufferObject);
+        owlGeomSetBuffer(triangleGeom, "normalScreenBuffer", normalBufferObject);
+        owlGeomSetBuffer(triangleGeom, "index", indexBufferObject);
+        owlGeomSetBuffer(triangleGeom, "texCoord", texCoordBufferObject);
         owlGeomSet1ui(triangleGeom, "materialID", mesh->materialID);
 
         // ====================================================
@@ -529,8 +527,8 @@ void Viewer::resize(const owl::common::vec2i& newSize)
     owlBufferResize(this->materialIDBuffer, newSize.x * newSize.y);
     owlParamsSetBuffer(this->launchParams, "materialIDBuffer", this->materialIDBuffer);
 
-    owlBufferResize(this->normalBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "normalBuffer", this->normalBuffer);
+    owlBufferResize(this->normalScreenBuffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "normalScreenBuffer", this->normalScreenBuffer);
 
     // Perform camera move i.e. set new camera parameters, and set SBT to be updated
     this->cameraChanged();
@@ -662,9 +660,9 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
 
 
 
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalBuffer.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalScreenBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->normalBuffer, 1);
+            savebuffer(fp, &this->normalScreenBuffer, 1);
 
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");
@@ -676,9 +674,9 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
             fp = fopen(fileName.c_str(), "wb");
             savebuffer(fp, &this->accumBuffer, this->accumId);
 
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalBuffer.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalScreenBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->normalBuffer, 1);
+            savebuffer(fp, &this->normalScreenBuffer, 1);
 
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDBuffer.btc";
             fp = fopen(fileName.c_str(), "wb");

@@ -44,7 +44,7 @@ namespace std {
 /*! \namespace osc - Optix Siggraph Course */
 namespace osc {
 
-    /*! find vertex with given position, normalBuffer, texcoord, and return
+    /*! find vertex with given position, normal, texcoord, and return
         its vertex ID, or, if it doesn't exit, add it to the mesh, and
         its just-created index */
     int addVertex(TriangleMesh* mesh,
@@ -64,8 +64,8 @@ namespace osc {
 
         mesh->vertex.push_back(vertex_array[idx.vertex_index]);
         if (idx.normal_index >= 0) {
-            while (mesh->normalBuffer.size() < mesh->vertex.size())
-                mesh->normalBuffer.push_back(normal_array[idx.normal_index]);
+            while (mesh->normal.size() < mesh->vertex.size())
+                mesh->normal.push_back(normal_array[idx.normal_index]);
         }
         if (idx.texcoord_index >= 0) {
             while (mesh->texcoord.size() < mesh->vertex.size())
@@ -189,10 +189,10 @@ namespace osc {
                     mesh->vertex.push_back(vertex_array[idx2.vertex_index]);
                     mesh->index.push_back(vidx);
 
-                    owl::common::vec3i nidx(mesh->normalBuffer.size(), mesh->normalBuffer.size() + 1, mesh->normalBuffer.size() + 2);
-                    mesh->normalBuffer.push_back(normal_array[idx0.normal_index]);
-                    mesh->normalBuffer.push_back(normal_array[idx1.normal_index]);
-                    mesh->normalBuffer.push_back(normal_array[idx2.normal_index]);
+                    owl::common::vec3i nidx(mesh->normal.size(), mesh->normal.size() + 1, mesh->normal.size() + 2);
+                    mesh->normal.push_back(normal_array[idx0.normal_index]);
+                    mesh->normal.push_back(normal_array[idx1.normal_index]);
+                    mesh->normal.push_back(normal_array[idx2.normal_index]);
                     // mesh->index.push_back(nidx);
 
                     owl::common::vec3i tidx(mesh->texcoord.size(), mesh->texcoord.size() + 1, mesh->texcoord.size() + 2);

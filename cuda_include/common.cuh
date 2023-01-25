@@ -64,7 +64,7 @@ typedef owl::RayT<1, 2> ShadowRay;
 struct TriLight {
 	owl::common::vec3f v1, v2, v3;
 	owl::common::vec3f cg;
-	owl::common::vec3f normalBuffer;
+	owl::common::vec3f normalScreenBuffer;
 	owl::common::vec3f emit;
 
 	//float flux;
@@ -85,7 +85,7 @@ struct LaunchParams {
 	float4* ltc_buffer;
 	float4* stoDirectRatio;
 	float4* stoNoVisRatio;
-	float4* normalBuffer;
+	float4* normalScreenBuffer;
 	float4* materialIDBuffer;
 	int accumId;
 
@@ -118,7 +118,7 @@ struct RayGenData {
 
 struct TriangleMeshData {
 	owl::common::vec3f* vertex;
-	owl::common::vec3f* normalBuffer;
+	owl::common::vec3f* normalScreenBuffer;
 	owl::common::vec3i* index;
 	owl::common::vec2f* texCoord;
 
@@ -145,7 +145,7 @@ struct MissProgData {
 
 struct ShadowRayData {
 	owl::common::vec3f visibility = owl::common::vec3f(0.f);
-	owl::common::vec3f point = owl::common::vec3f(0.f), normalBuffer = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
+	owl::common::vec3f point = owl::common::vec3f(0.f), normalScreenBuffer = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
 };
 
 

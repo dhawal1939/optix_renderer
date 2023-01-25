@@ -30,11 +30,21 @@ except:
     pass
 
 try:
-    with open("saves/normal.btc", "r") as f:
+    with open("saves/normalBuffer.btc", "r") as f:
         a = np.fromfile(f, dtype='f4')
         a_ = a.reshape(-1,4)
         stoNoVis = np.flipud(a_.reshape(-1,1024, 4))[..., :3]
         imageio.imwrite('saves/normal.exr', stoNoVis)
+except:
+    pass
+
+
+try:
+    with open("saves/materialIDBuffer.btc", "r") as f:
+        a = np.fromfile(f, dtype='f4')
+        a_ = a.reshape(-1,4)
+        stoNoVis = np.flipud(a_.reshape(-1,1024, 4))[..., :3]
+        imageio.imwrite('saves/uv.exr', stoNoVis)
 except:
     pass
 
