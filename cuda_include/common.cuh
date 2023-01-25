@@ -58,7 +58,7 @@ bool CHECK_IF_LTC(RendererType t)
 
 #ifdef __CUDA_ARCH__
 typedef owl::RayT<0, 2> RadianceRay;
-typedef owl::RayT<1, 2> ShadowRay;
+//typedef owl::RayT<1, 2> ShadowRay;
 #endif
 
 struct TriLight {
@@ -81,12 +81,23 @@ struct LaunchParams {
 	bool clicked;
 	owl::common::vec2i pixelId;
 
-	float4* accumScreenBuffer;
-	float4* ltc_buffer;
-	float4* stoDirectRatioBuffer;
-	float4* stoNoVisRatioScreenBuffer;
-	float4* normalScreenBuffer;
-	float4* materialIDScreenBuffer;
+	float4* position_screen_buffer;
+	float4* normal_screen_buffer;
+	float4* uv_screen_buffer;
+	float4* albedo_screen_buffer;
+	float4* alpha_screen_buffer;
+	float4* materialID_screen_buffer;
+
+	float4* bounce0_screen_buffer;
+	float4* bounce1_screen_buffer;
+	float4* bounce2_screen_buffer;
+
+	float4* ltc_screen_buffer;
+	float4* sto_direct_ratio_screen_buffer;
+	float4* sto_no_vis_ratio_screen_buffer;
+	
+	float4* accum_screen_buffer;
+	
 	int accumId;
 
 	int rendererType;
@@ -145,7 +156,7 @@ struct MissProgData {
 
 struct ShadowRayData {
 	owl::common::vec3f visibility = owl::common::vec3f(0.f);
-	owl::common::vec3f point = owl::common::vec3f(0.f), normalScreenBuffer = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
+	owl::common::vec3f point = owl::common::vec3f(0.f), normal_screen_buffer = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
 };
 
 

@@ -81,8 +81,8 @@ struct Viewer :public owl::viewer::OWLViewer
     std::string gl_version;
 
     std::string to_save_file;
-    // /*! this function gets called whenever any camera manipulator
-    //   updates the camera. gets called AFTER all values have been updated */
+    // this function gets called whenever any camera manipulator
+    // updates the camera. gets called AFTER all values have been updated
     void cameraChanged() override;
 
     void key(char key, const owl::common::vec2i& pos) override;
@@ -93,12 +93,23 @@ struct Viewer :public owl::viewer::OWLViewer
     RendererType rendererType;
     bool sbtDirty = true;
 
-    OWLBuffer accumScreenBuffer{ 0 };
-    OWLBuffer ltc_buffer{ 0 };
-    OWLBuffer stoDirectRatioBuffer{ 0 };
-    OWLBuffer stoNoVisRatioScreenBuffer{ 0 };
-    OWLBuffer materialIDScreenBuffer{ 0 };
-    OWLBuffer normalScreenBuffer{ 0 };
+    OWLBuffer position_screen_buffer{ 0 };
+    OWLBuffer normal_screen_buffer{ 0 };
+    OWLBuffer uv_screen_buffer{ 0 };
+    OWLBuffer albedo_screen_buffer{ 0 };
+    OWLBuffer alpha_screen_buffer{ 0 };
+    OWLBuffer materialID_screen_buffer{ 0 };
+
+
+    OWLBuffer accum_screen_buffer{ 0 };
+    OWLBuffer bounce0_screen_buffer{ 0 };
+    OWLBuffer bounce1_screen_buffer{ 0 };
+    OWLBuffer bounce2_screen_buffer{ 0 };
+    
+    OWLBuffer ltc_screen_buffer{ 0 };
+    OWLBuffer sto_direct_ratio_screen_buffer{ 0 };
+    OWLBuffer sto_no_vis_ratio_screen_buffer{ 0 };
+    
 
     int accumId = 0;
 
@@ -148,6 +159,7 @@ int Viewer::imgui_init(bool _callbacks, const char* gl_version)
     return ImGui_ImplOpenGL3_Init(gl_version);
 }
 
+
 Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType renderer_type, bool interactive = true, bool vsync = false)
     : owl::viewer::OWLViewer("Optix Viewer", resolution, interactive, vsync)
 {
@@ -165,27 +177,55 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     this->context = owlContextCreate(nullptr, 1);
     this->module = owlModuleCreate(this->context, deviceCode_ptx);
 
-    this->ltc_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->ltc_buffer, this->getWindowSize().x * this->getWindowSize().y);
+    // Position normal albedo alpha material buffers
+    this->position_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->position_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    this->normal_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->normal_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    this->uv_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->uv_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    this->albedo_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->albedo_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
     
-    this->stoDirectRatioBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->stoDirectRatioBuffer, this->getWindowSize().x * this->getWindowSize().y);
+    this->alpha_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->alpha_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    this->materialID_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->materialID_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+
+    // Bounce information
+    this->bounce0_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->bounce0_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    this->bounce1_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->bounce1_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+    this->bounce2_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->bounce2_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+
+
+    // Ratio estimator ltc buffers
+    this->ltc_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->ltc_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
     
-    this->stoNoVisRatioScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->stoNoVisRatioScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
-
-
-    this->normalScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->normalScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
+    this->sto_direct_ratio_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->sto_direct_ratio_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
     
-    this->materialIDScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->materialIDScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
-
-    this->accumScreenBuffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
-    owlBufferResize(this->accumScreenBuffer, this->getWindowSize().x * this->getWindowSize().y);
+    this->sto_no_vis_ratio_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->sto_no_vis_ratio_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
 
 
-    owlContextSetRayTypeCount(context, 2);
+    // Accumulation buffer
+    this->accum_screen_buffer = owlDeviceBufferCreate(this->context, OWL_FLOAT4, 1, nullptr);
+    owlBufferResize(this->accum_screen_buffer, this->getWindowSize().x * this->getWindowSize().y);
+
+
+    owlContextSetRayTypeCount(context, 1);
 
     // ====================================================
     // Area lights setup (Assume triangular area lights)
@@ -227,6 +267,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     // ====================================================
     // Launch Parameters setup
     // ====================================================
+
     OWLVarDecl launchParamsDecl[] = {
         // The actual light triangles
         {"triLights", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, triLights)},
@@ -234,16 +275,29 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         // The mesh lights
         {"meshLights", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, meshLights)},
         {"numMeshLights", OWL_INT, OWL_OFFSETOF(LaunchParams, numMeshLights)},
-        // All other parameters
-        {"accumScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumScreenBuffer)},
+
+        // Position normal albedo alpha material buffers
+        {"position_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, position_screen_buffer)},
+        {"normal_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, normal_screen_buffer)},
+        {"uv_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, uv_screen_buffer)},
+        {"albedo_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, albedo_screen_buffer)},
+        {"alpha_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, alpha_screen_buffer)},
+        {"materialID_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, materialID_screen_buffer)},
+
+        // Bounce Info
+        {"bounce0_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, bounce0_screen_buffer)},
+        {"bounce1_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, bounce1_screen_buffer)},
+        {"bounce2_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, bounce2_screen_buffer)},
+
+        // Ratio Estimator
+        {"ltc_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, ltc_screen_buffer)},
+        {"sto_direct_ratio_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, sto_direct_ratio_screen_buffer)},
+        {"sto_no_vis_ratio_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, sto_no_vis_ratio_screen_buffer)},
         
-        {"ltc_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, ltc_buffer)},
-        {"stoDirectRatioBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoDirectRatioBuffer)},
-        {"stoNoVisRatioScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, stoNoVisRatioScreenBuffer)},
+        // Accumulation buffer
+        {"accum_screen_buffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accum_screen_buffer)},
 
-        {"materialIDScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, materialIDScreenBuffer)},
-        {"normalScreenBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, normalScreenBuffer)},
-
+        // All other parameters
         {"accumId", OWL_INT, OWL_OFFSETOF(LaunchParams, accumId)},
         {"rendererType", OWL_INT, OWL_OFFSETOF(LaunchParams, rendererType)},
         {"world", OWL_GROUP, OWL_OFFSETOF(LaunchParams, world)},
@@ -288,16 +342,26 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     owlParamsSetBuffer(this->launchParams, "meshLights", meshLightsBuffer);
     owlParamsSet1i(this->launchParams, "numMeshLights", this->meshLightList.size());
 
+
+    owlParamsSetBuffer(this->launchParams, "position_screen_buffer", this->position_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "normal_screen_buffer", this->normal_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "uv_screen_buffer", this->uv_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "albedo_screen_buffer", this->albedo_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "alpha_screen_buffer", this->alpha_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "materialID_screen_buffer", this->materialID_screen_buffer);
+
+    owlParamsSetBuffer(this->launchParams, "bounce0_screen_buffer", this->bounce0_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "bounce1_screen_buffer", this->bounce1_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "bounce2_screen_buffer", this->bounce2_screen_buffer);
+
+    //Ratio Estimator
+    owlParamsSetBuffer(this->launchParams, "ltc_screen_buffer", this->ltc_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "sto_direct_ratio_screen_buffer", this->sto_direct_ratio_screen_buffer);
+    owlParamsSetBuffer(this->launchParams, "sto_no_vis_ratio_screen_buffer", this->sto_no_vis_ratio_screen_buffer);
+
     // Upload accumulation buffer and ID
     owlParamsSet1i(this->launchParams, "accumId", this->accumId);
-    owlParamsSetBuffer(this->launchParams, "accumScreenBuffer", this->accumScreenBuffer);
-
-    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
-    owlParamsSetBuffer(this->launchParams, "stoDirectRatioBuffer", this->stoDirectRatioBuffer);
-    owlParamsSetBuffer(this->launchParams, "stoNoVisRatioScreenBuffer", this->stoNoVisRatioScreenBuffer);
-
-    owlParamsSetBuffer(this->launchParams, "normalScreenBuffer", this->normalScreenBuffer);
-    owlParamsSetBuffer(this->launchParams, "materialIDScreenBuffer", this->materialIDScreenBuffer);
+    owlParamsSetBuffer(this->launchParams, "accum_screen_buffer", this->accum_screen_buffer);
 
     // ====================================================
     // Scene setup (scene geometry and materials)
@@ -333,7 +397,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
             {"alpha_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, alpha_texture)},
             {"hasAlphaTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, hasAlphaTexture)},
             
-            {"normalScreenBuffer", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, normal_map)},
+            {"normal_map", OWL_FLOAT, OWL_OFFSETOF(TriangleMeshData, normal_map)},
             {"normal_texture", OWL_TEXTURE, OWL_OFFSETOF(TriangleMeshData, hasNormalTexture)},
             {"hasNormalTexture", OWL_BOOL, OWL_OFFSETOF(TriangleMeshData, normal_texture)},
             {nullptr}
@@ -352,7 +416,7 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
 
         // Defines the function name in .cu file, to be used for closest hit processing
         owlGeomTypeSetClosestHit(triangleGeomType, RADIANCE_RAY_TYPE, module, "triangleMeshCH");
-        owlGeomTypeSetClosestHit(triangleGeomType, SHADOW_RAY_TYPE, module, "triangleMeshCH");
+        //owlGeomTypeSetClosestHit(triangleGeomType, SHADOW_RAY_TYPE, module, "triangleMeshCH");
 
         // Create the actual geometry on the device
         OWLGeom triangleGeom = owlGeomCreate(context, triangleGeomType);
@@ -506,29 +570,42 @@ void Viewer::render()
 /*! window notifies us that we got resized */
 void Viewer::resize(const owl::common::vec2i& newSize)
 {
+    // Do not resize, what is the point..
+    
     // Resize framebuffer, and other ops (OWL::Viewer ops)
     OWLViewer::resize(newSize);
-
+    
     // Resize accumulation buffer, and set to launch params
-    
+    owlBufferResize(this->position_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "position_screen_buffer", this->position_screen_buffer);
+    owlBufferResize(this->normal_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "normal_screen_buffer", this->normal_screen_buffer);
+    owlBufferResize(this->uv_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "uv_screen_buffer", this->uv_screen_buffer);
+    owlBufferResize(this->albedo_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "albedo_screen_buffer", this->albedo_screen_buffer);
+    owlBufferResize(this->alpha_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "alpha_screen_buffer", this->alpha_screen_buffer);
+    owlBufferResize(this->materialID_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "materialID_screen_buffer", this->materialID_screen_buffer);
 
-    owlBufferResize(this->accumScreenBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "accumScreenBuffer", this->accumScreenBuffer);
 
-    owlBufferResize(this->ltc_buffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "ltc_buffer", this->ltc_buffer);
-    
-    owlBufferResize(this->stoDirectRatioBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "stoDirectRatioBuffer", this->stoDirectRatioBuffer);
+    owlBufferResize(this->accum_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "accum_screen_buffer", this->accum_screen_buffer);
+    owlBufferResize(this->bounce0_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "bounce0_screen_buffer", this->bounce0_screen_buffer);
+    owlBufferResize(this->bounce1_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "bounce1_screen_buffer", this->bounce1_screen_buffer);
+    owlBufferResize(this->bounce2_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "bounce2_screen_buffer", this->bounce2_screen_buffer);
 
-    owlBufferResize(this->stoNoVisRatioScreenBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "stoNoVisRatioScreenBuffer", this->stoNoVisRatioScreenBuffer);
+    owlBufferResize(this->ltc_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "ltc_screen_buffer", this->ltc_screen_buffer);
+    owlBufferResize(this->sto_direct_ratio_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "sto_direct_ratio_screen_buffer", this->sto_direct_ratio_screen_buffer);
+    owlBufferResize(this->sto_no_vis_ratio_screen_buffer, newSize.x * newSize.y);
+    owlParamsSetBuffer(this->launchParams, "sto_no_vis_ratio_screen_buffer", this->sto_no_vis_ratio_screen_buffer);
 
-    owlBufferResize(this->materialIDScreenBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "materialIDScreenBuffer", this->materialIDScreenBuffer);
-
-    owlBufferResize(this->normalScreenBuffer, newSize.x * newSize.y);
-    owlParamsSetBuffer(this->launchParams, "normalScreenBuffer", this->normalScreenBuffer);
 
     // Perform camera move i.e. set new camera parameters, and set SBT to be updated
     this->cameraChanged();
@@ -644,50 +721,80 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
         if (this->rendererType == RATIO)
         {
 
-            //this->denoise(owlBufferGetPointer(this->stoDirectRatioBuffer, 0));
+            //this->denoise(owlBufferGetPointer(this->sto_direct_ratio_screen_buffer, 0));
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/stoDirect.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->stoDirectRatioBuffer, 1);
+            savebuffer(fp, &this->sto_direct_ratio_screen_buffer, 1);
 
-            //this->denoise(owlBufferGetPointer(this->stoNoVisRatioScreenBuffer, 0));
+            //this->denoise(owlBufferGetPointer(this->sto_no_vis_ratio_screen_buffer, 0));
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/stoNoVis.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->stoNoVisRatioScreenBuffer, 1);
+            savebuffer(fp, &this->sto_no_vis_ratio_screen_buffer, 1);
 
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/ltc.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->ltc_buffer, 1);
+            savebuffer(fp, &this->ltc_screen_buffer, 1);
 
 
 
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalScreenBuffer.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normal_screen_buffer.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->normalScreenBuffer, 1);
+            savebuffer(fp, &this->normal_screen_buffer, 1);
 
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDScreenBuffer.btc";
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialID_screen_buffer.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->materialIDScreenBuffer, 1);
+            savebuffer(fp, &this->materialID_screen_buffer, 1);
         }
         if (this->rendererType == PATH)
         {
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/position_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->position_screen_buffer, 1);
+            
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normal_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->normal_screen_buffer, 1);
+            
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/uv_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->uv_screen_buffer, 1);
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/alpha_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->alpha_screen_buffer, 1);
+            
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/albedo_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->albedo_screen_buffer, 1);
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialID_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->materialID_screen_buffer, 1);
+                
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/bounce0_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->bounce0_screen_buffer, this->accumId);
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/bounce1_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->bounce1_screen_buffer, this->accumId);
+
+            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/bounce2_screen_buffer.btc";
+            fp = fopen(fileName.c_str(), "wb");
+            savebuffer(fp, &this->bounce2_screen_buffer, this->accumId);
+
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/path.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->accumScreenBuffer, this->accumId);
-
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/normalScreenBuffer.btc";
-            fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->normalScreenBuffer, 1);
-
-            fileName = "C:/Users/dhawals/repos/optix_renderer/saves/materialIDScreenBuffer.btc";
-            fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->materialIDScreenBuffer, 1);
+            savebuffer(fp, &this->accum_screen_buffer, this->accumId);
         }
 
         if (this->rendererType == LTC_BASELINE)
         {
             fileName = "C:/Users/dhawals/repos/optix_renderer/saves/ltc_baseline.btc";
             fp = fopen(fileName.c_str(), "wb");
-            savebuffer(fp, &this->accumScreenBuffer, 1);
+            savebuffer(fp, &this->accum_screen_buffer, 1);
         }
     }
 }
@@ -801,7 +908,7 @@ void Viewer::denoise(const void* to_denoise_ptr)
     //inputLayer[0].format = OPTIX_PIXEL_FORMAT_FLOAT4;
 
     ///*
-    //inputLayer[1].data = (CUdeviceptr)this->materialIDScreenBuffer;
+    //inputLayer[1].data = (CUdeviceptr)this->materialID_screen_buffer;
     //inputLayer[1].width = this->fbSize.x;
     //inputLayer[1].height = this->fbSize.y;
     //inputLayer[1].rowStrideInBytes = this->fbSize.x * sizeof(float4);
@@ -825,7 +932,7 @@ void Viewer::denoise(const void* to_denoise_ptr)
     //outputLayer.format = OPTIX_PIXEL_FORMAT_FLOAT4;
 
     //OptixDenoiserGuideLayer denoiserGuideLayer = {};
-    ///*denoiserGuideLayer.materialIDScreenBuffer = inputLayer[1];
+    ///*denoiserGuideLayer.materialID_screen_buffer = inputLayer[1];
     //denoiserGuideLayer.normalBuffer = inputLayer[2];*/
 
     //OptixDenoiserLayer denoiserLayer = {};

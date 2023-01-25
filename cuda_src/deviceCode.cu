@@ -118,9 +118,9 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         if (si.isLight)
         {
             color = si.emit;
-            optixLaunchParams.ltc_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-            optixLaunchParams.stoDirectRatioBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-            optixLaunchParams.stoNoVisRatioScreenBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.ltc_screen_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.sto_direct_ratio_screen_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+            optixLaunchParams.sto_no_vis_ratio_screen_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
         }
         else
         {
@@ -136,11 +136,11 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             colors.colors[1] /= n;
             color = ltc_color;
             
-            optixLaunchParams.ltc_buffer[fbOfs] = make_float4(ltc_color.x, ltc_color.y, ltc_color.z, 1.f);
+            optixLaunchParams.ltc_screen_buffer[fbOfs] = make_float4(ltc_color.x, ltc_color.y, ltc_color.z, 1.f);
             float color_direct = (colors.colors[0].x + colors.colors[0].y + colors.colors[0].z) / 3.f;
             float color_noVis = (colors.colors[1].x + colors.colors[1].y + colors.colors[1].z) / 3.f;
-            optixLaunchParams.stoDirectRatioBuffer[fbOfs] = make_float4(color_direct, color_direct, color_direct, 1.f);
-            optixLaunchParams.stoNoVisRatioScreenBuffer[fbOfs] = make_float4(color_noVis, color_noVis, color_noVis, 1.f);
+            optixLaunchParams.sto_direct_ratio_screen_buffer[fbOfs] = make_float4(color_direct, color_direct, color_direct, 1.f);
+            optixLaunchParams.sto_no_vis_ratio_screen_buffer[fbOfs] = make_float4(color_noVis, color_noVis, color_noVis, 1.f);
         }
     }
     else if (optixLaunchParams.rendererType == PATH)
@@ -156,11 +156,18 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     }
   
     if (optixLaunchParams.accumId > 0)
-        color = color + owl::common::vec3f(optixLaunchParams.accumScreenBuffer[fbOfs].x, optixLaunchParams.accumScreenBuffer[fbOfs].y,
-            optixLaunchParams.accumScreenBuffer[fbOfs].z);
-    optixLaunchParams.accumScreenBuffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-    optixLaunchParams.materialIDScreenBuffer[fbOfs] = make_float4(si.materialID, si.materialID, si.materialID, 1.f);
-    optixLaunchParams.normalScreenBuffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
+        color = color + owl::common::vec3f(optixLaunchParams.accum_screen_buffer[fbOfs].x, optixLaunchParams.accum_screen_buffer[fbOfs].y,
+            optixLaunchParams.accum_screen_buffer[fbOfs].z);
+    optixLaunchParams.accum_screen_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
+    
+    optixLaunchParams.position_screen_buffer[fbOfs] = make_float4(si.p.x, si.p.y, si.p.z, 1.f);
+    optixLaunchParams.normal_screen_buffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
+    optixLaunchParams.albedo_screen_buffer[fbOfs] = make_float4(si.diffuse.x, si.diffuse.y, si.diffuse.z, 1.f);
+    optixLaunchParams.alpha_screen_buffer[fbOfs] = make_float4(si.alpha, 0.f, 0.f, 1.f);
+    optixLaunchParams.uv_screen_buffer[fbOfs] = make_float4(si.uv.x, si.uv.y, si.diffuse.z, 1.f);
+    optixLaunchParams.materialID_screen_buffer[fbOfs] = make_float4(si.materialID, 0.f, 0.f, 1.f);
+
+
 
     color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
 
