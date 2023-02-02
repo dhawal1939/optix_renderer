@@ -148,7 +148,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         if (si.isLight)
             color = si.emit;
         else
-           color = estimatePathTracing(si, rng, ray, 2);
+           color = estimatePathTracing(si, rng, ray, 1);
 
     }
     else {

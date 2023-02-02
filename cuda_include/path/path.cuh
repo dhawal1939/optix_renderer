@@ -172,37 +172,37 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, Rad
         float current_alpha = current_si.alpha;
         // MIS
         // Light sampling
-        {
+        //{
 
-            float lightPdf = sampleLightPdf(selectedLightIdx);
+        //    float lightPdf = sampleLightPdf(selectedLightIdx);
 
-            owl::common::vec3f newPos = sampleLight(selectedLightIdx, rand1);
-            owl::common::vec3f L = owl::common::normalize(newPos - current_si.p);  // incoming from light
-            float dist = owl::common::length(newPos - current_si.p);
-            dist = dist * dist;
+        //    owl::common::vec3f newPos = sampleLight(selectedLightIdx, rand1);
+        //    owl::common::vec3f L = owl::common::normalize(newPos - current_si.p);  // incoming from light
+        //    float dist = owl::common::length(newPos - current_si.p);
+        //    dist = dist * dist;
 
-            ray.origin = current_si.p + current_si.n_geom * float(1e-3);
-            ray.direction = L;
+        //    ray.origin = current_si.p + current_si.n_geom * float(1e-3);
+        //    ray.direction = L;
 
-            owl::traceRay(optixLaunchParams.world, ray, light_si);
-            float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, light_si.n_geom)); // check if -L is required or just L works
+        //    owl::traceRay(optixLaunchParams.world, ray, light_si);
+        //    float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, light_si.n_geom)); // check if -L is required or just L works
 
-            if (light_si.isLight) {
-                owl::common::vec3f H = normalize(L + V);
-                owl::vec3f wi_local = normalize(apply_mat(current_si.to_local, L));
-                owl::vec3f wo_local = normalize(apply_mat(current_si.to_local, V));
-                float brdfPdf = pdf(wi_local, wo_local, current_si.diffuse, 1., current_si.alpha); // brdf pdf of current point
-                float metalness = 0.5f, reflectance = 0.5f;
-                owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
-                    current_si.diffuse * metalness;
-                owl::common::vec3f brdf = evaluate(wi_local, wo_local, current_si.diffuse, current_alpha, current_si.emit); // brdf of current point
-                float misW = balanceHeuristic(1, lightPdfW, 1, brdfPdf);
-                color += misW * light_si.emit * tp * brdf * clampDot(current_si.n_geom, L, false) / lightPdfW;
-                color.x = owl::common::max(color.x, EPS);
-                color.y = owl::common::max(color.y, EPS);
-                color.z = owl::common::max(color.z, EPS);
-            }
-        }
+        //    if (light_si.isLight) {
+        //        owl::common::vec3f H = normalize(L + V);
+        //        owl::vec3f wi_local = normalize(apply_mat(current_si.to_local, L));
+        //        owl::vec3f wo_local = normalize(apply_mat(current_si.to_local, V));
+        //        float brdfPdf = pdf(wi_local, wo_local, current_si.diffuse, 1., current_si.alpha); // brdf pdf of current point
+        //        float metalness = 0.5f, reflectance = 0.5f;
+        //        owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
+        //            current_si.diffuse * metalness;
+        //        owl::common::vec3f brdf = evaluate(wi_local, wo_local, current_si.diffuse, current_alpha, current_si.emit); // brdf of current point
+        //        float misW = balanceHeuristic(1, lightPdfW, 1, brdfPdf);
+        //        color += misW * light_si.emit * tp * brdf * clampDot(current_si.n_geom, L, false) / lightPdfW;
+        //        color.x = owl::common::max(color.x, EPS);
+        //        color.y = owl::common::max(color.y, EPS);
+        //        color.z = owl::common::max(color.z, EPS);
+        //    }
+        //}
         //BRDF Sampling
         {
             owl::vec3f wo_local = normalize(apply_mat(current_si.to_local, V));
@@ -213,6 +213,8 @@ owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, Rad
 
             ray.origin = current_si.p + EPS * current_si.n_geom;
             ray.direction = normalize(apply_mat(current_si.to_world, wi_local));
+            color = wi_local;
+            continue;
 
             owl::traceRay(optixLaunchParams.world, ray, brdf_si);
 
