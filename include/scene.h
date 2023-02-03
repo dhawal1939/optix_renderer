@@ -7,9 +7,9 @@ using namespace osc;
 
 struct SceneCamera
 {
-	owl::common::vec3f from;
-	owl::common::vec3f at;
-	owl::common::vec3f up;
+	VEC3f from;
+	VEC3f at;
+	VEC3f up;
 	float cosFovy;
 };
 

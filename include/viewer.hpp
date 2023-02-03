@@ -52,19 +52,19 @@
 #include <ltc/ltc_isotropic.h>
 #include <cuda_include/common.cuh>
 
-// const owl::common::vec2i fbSize(800,600);
+// const VEC2i fbSize(800,600);
 
 // Compiled PTX code
 extern "C" char deviceCode_ptx[];
 
-const owl::common::vec3f init_lookFrom(-4.f, +3.f, -2.f);
-const owl::common::vec3f init_lookAt(0.f, 0.f, 0.f);
-const owl::common::vec3f init_lookUp(0.f, 1.f, 0.f);
+const VEC3f init_lookFrom(-4.f, +3.f, -2.f);
+const VEC3f init_lookAt(0.f, 0.f, 0.f);
+const VEC3f init_lookUp(0.f, 1.f, 0.f);
 const float init_cosFovy = 0.66f;
 
 struct Viewer :public owl::viewer::OWLViewer
 {
-    Viewer(Scene& scene, owl::common::vec2i resolution, RendererType renderer_type, bool interactive, bool vsync);
+    Viewer(Scene& scene, VEC2i resolution, RendererType renderer_type, bool save_flag, bool interactive, bool vsync);
 
     /*! gets called whenever the viewer needs us to re-render out widget */
     void render() override;
@@ -73,7 +73,7 @@ struct Viewer :public owl::viewer::OWLViewer
     // /*! window notifies us that we got resized. We HAVE to override
     //     this to know our actual render dimensions, and get pointer
     //     to the device frame buffer that the viewer cated for us */
-    void resize(const owl::common::vec2i& newSize) override;
+    void resize(const VEC2i& newSize) override;
 
     int imgui_init(bool _callbacks, const char* gl_version);
     void Viewer::savebuffer(FILE* fp, OWLBuffer* buffer, int avg_factor);
@@ -81,12 +81,13 @@ struct Viewer :public owl::viewer::OWLViewer
     std::string gl_version;
 
     std::string to_save_file;
+    bool save_flag;
     // this function gets called whenever any camera manipulator
     // updates the camera. gets called AFTER all values have been updated
     void cameraChanged() override;
 
-    void key(char key, const owl::common::vec2i& pos) override;
-    void mouseButtonLeft(const owl::common::vec2i & where, bool pressed) override;
+    void key(char key, const VEC2i& pos) override;
+    void mouseButtonLeft(const VEC2i & where, bool pressed) override;
 
     void setRendererType(RendererType type);
 
@@ -137,7 +138,7 @@ struct Viewer :public owl::viewer::OWLViewer
 
     void denoise(const void* to_denoise);
     void denoise_setup();
-    owl::common::vec2i numBlocksAndThreads;
+    VEC2i numBlocksAndThreads;
     unsigned int denoiserScratchSize;
     unsigned int denoiserStateSize;
     OptixDenoiser denoiser;
@@ -160,7 +161,7 @@ int Viewer::imgui_init(bool _callbacks, const char* gl_version)
 }
 
 
-Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType renderer_type, bool interactive = true, bool vsync = false)
+Viewer::Viewer(Scene& scene, VEC2i resolution, RendererType renderer_type, bool save_flag, bool interactive = true, bool vsync = false)
     : owl::viewer::OWLViewer("Optix Viewer", resolution, interactive, vsync)
 {
 
@@ -172,6 +173,9 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
     {
         LOG("IMGUI Init Failed")
     }
+
+    // to save or not
+    this->save_flag = save_flag;
 
     // Context & Module creation, accumulation buffer initialize
     this->context = owlContextCreate(nullptr, 1);
@@ -491,8 +495,8 @@ Viewer::Viewer(Scene& scene, owl::common::vec2i resolution, RendererType rendere
         // ====================================================
 
         // Set vertices, indices and UV coords on the device
-        owlTrianglesSetVertices(triangleGeom, vertexBufferObject, mesh->vertex.size(), sizeof(owl::common::vec3f), 0);
-        owlTrianglesSetIndices(triangleGeom, indexBufferObject, mesh->index.size(), sizeof(owl::common::vec3i), 0);
+        owlTrianglesSetVertices(triangleGeom, vertexBufferObject, mesh->vertex.size(), sizeof(VEC3f), 0);
+        owlTrianglesSetIndices(triangleGeom, indexBufferObject, mesh->index.size(), sizeof(VEC3i), 0);
 
         owlGeomSetBuffer(triangleGeom, "vertex", vertexBufferObject);
         owlGeomSetBuffer(triangleGeom, "normal", normalBufferObject);
@@ -568,7 +572,7 @@ void Viewer::render()
 }
 
 /*! window notifies us that we got resized */
-void Viewer::resize(const owl::common::vec2i& newSize)
+void Viewer::resize(const VEC2i& newSize)
 {
     // Do not resize, what is the point..
     
@@ -623,20 +627,20 @@ void Viewer::cameraChanged()
     // Reset accumulation buffer, to restart MC sampling
     this->accumId = 0;
 
-    const owl::common::vec3f lookFrom = camera.getFrom();
-    const owl::common::vec3f lookAt = camera.getAt();
-    const owl::common::vec3f lookUp = camera.getUp();
+    const VEC3f lookFrom = camera.getFrom();
+    const VEC3f lookAt = camera.getAt();
+    const VEC3f lookUp = camera.getUp();
     const float cosFovy = camera.getCosFovy();
 
     printf("Fovy, %f\n lookfrom %f %f %f\nlookat %f %f %f\nlookup %f %f %f\n",
         cosFovy, lookFrom.x, lookFrom.y, lookFrom.z, lookAt.x, lookAt.y, lookAt.z, lookUp.x, lookUp.y, lookUp.z);
 
     // ----------- compute variable values  ------------------
-    owl::common::vec3f camera_pos = lookFrom;
-    owl::common::vec3f camera_d00 = normalize(lookAt - lookFrom);
+    VEC3f camera_pos = lookFrom;
+    VEC3f camera_d00 = normalize(lookAt - lookFrom);
     float aspect = fbSize.x / float(fbSize.y);
-    owl::common::vec3f camera_ddu = cosFovy * aspect * normalize(cross(camera_d00, lookUp));
-    owl::common::vec3f camera_ddv = cosFovy * normalize(cross(camera_ddu, camera_d00));
+    VEC3f camera_ddu = cosFovy * aspect * normalize(cross(camera_d00, lookUp));
+    VEC3f camera_ddv = cosFovy * normalize(cross(camera_ddu, camera_d00));
     camera_d00 -= 0.5f * camera_ddu;
     camera_d00 -= 0.5f * camera_ddv;
 
@@ -712,9 +716,9 @@ void Viewer::savebuffer(FILE* fp, OWLBuffer* owlbuffer, int avg_factor)
     }
 }
 
-void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
+void Viewer::mouseButtonLeft(const VEC2i& where, bool pressed)
 {
-    if (pressed == true) {
+    if (pressed == true && this->save_flag) {
         printf("framesize %d %d\n\n\n", this->fbSize.x, this->fbSize.y);
         std::string fileName;
         FILE *fp;
@@ -799,10 +803,10 @@ void Viewer::mouseButtonLeft(const owl::common::vec2i& where, bool pressed)
     }
 }
 
-void Viewer::key(char key, const owl::common::vec2i& pos)
+void Viewer::key(char key, const VEC2i& pos)
 {
     if (key == '1' || key == '!') {
-        this->camera.setOrientation(this->camera.getFrom(), owl::common::vec3f(0.f), owl::common::vec3f(0.f, 0.f, 1.f), this->camera.getFovyInDegrees());
+        this->camera.setOrientation(this->camera.getFrom(), VEC3f(0.f), VEC3f(0.f, 0.f, 1.f), this->camera.getFovyInDegrees());
         this->cameraChanged();
     }
     else if (key == 'R' || key == 'r') {
@@ -847,9 +851,9 @@ void Viewer::key(char key, const owl::common::vec2i& pos)
 void Viewer::denoise_setup()
 {
     //int frameSize = this->fbSize.x * this->fbSize.y;
-    //owl::common::vec2i frameRes = this->fbSize;
+    //VEC2i frameRes = this->fbSize;
     //int tileSize = 256;
-    //this->numBlocksAndThreads = owl::common::vec2i(frameRes.y / tileSize, frameRes.x / tileSize);
+    //this->numBlocksAndThreads = VEC2i(frameRes.y / tileSize, frameRes.x / tileSize);
     //auto optixContext = owlContextGetOptixContext(context, 0);
 
     //OptixDenoiserOptions denoiserOptions = {};

@@ -26,10 +26,10 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    owl::common::vec2i resolution(1024, 1024);
+    VEC2i resolution(1024, 1024);
     printf("%d %d reso\n", resolution.x, resolution.y);
 
-    Viewer win(scene, resolution, PATH);
+    Viewer win(scene, resolution, PATH, false);
     printf("framebuffer reso %d %d\n", win.getScreenSize().x, win.getScreenSize().y);
 
     //win.to_save_file = savePath;

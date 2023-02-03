@@ -55,9 +55,9 @@ namespace osc {
         if (knownVertices.find(idx) != knownVertices.end())
             return knownVertices[idx];
 
-        const owl::common::vec3f* vertex_array = (const owl::common::vec3f*)attributes.vertices.data();
-        const owl::common::vec3f* normal_array = (const owl::common::vec3f*)attributes.normals.data();
-        const owl::common::vec2f* texcoord_array = (const owl::common::vec2f*)attributes.texcoords.data();
+        const VEC3f* vertex_array = (const VEC3f*)attributes.vertices.data();
+        const VEC3f* normal_array = (const VEC3f*)attributes.normals.data();
+        const VEC2f* texcoord_array = (const VEC2f*)attributes.texcoords.data();
 
         int newID = (int)mesh->vertex.size();
         knownVertices[idx] = newID;
@@ -95,7 +95,7 @@ namespace osc {
             if (c == '\\') c = '/';
         fileName = modelPath + "/" + fileName;
 
-        owl::common::vec2i res;
+        VEC2i res;
         int   comp;
         unsigned char* image = stbi_load(fileName.c_str(),
             &res.x, &res.y, &comp, STBI_rgb_alpha);
@@ -155,9 +155,9 @@ namespace osc {
         if (materials.empty())
             throw std::runtime_error("could not parse materials ...");
 
-        const owl::common::vec3f* vertex_array = (const owl::common::vec3f*)attributes.vertices.data();
-        const owl::common::vec3f* normal_array = (const owl::common::vec3f*)attributes.normals.data();
-        const owl::common::vec2f* texcoord_array = (const owl::common::vec2f*)attributes.texcoords.data();
+        const VEC3f* vertex_array = (const VEC3f*)attributes.vertices.data();
+        const VEC3f* normal_array = (const VEC3f*)attributes.normals.data();
+        const VEC2f* texcoord_array = (const VEC2f*)attributes.texcoords.data();
 
         std::cout << "Done loading obj file - found " << shapes.size() << " shapes with " << materials.size() << " materials" << std::endl;
         std::map<std::string, int>      knownTextures;
@@ -179,29 +179,29 @@ namespace osc {
                     tinyobj::index_t idx1 = shape.mesh.indices[3 * faceID + 1];
                     tinyobj::index_t idx2 = shape.mesh.indices[3 * faceID + 2];
 
-                    // owl::common::vec3i idx(addVertex(mesh, attributes, idx0, knownVertices),
+                    // VEC3i idx(addVertex(mesh, attributes, idx0, knownVertices),
                     //     addVertex(mesh, attributes, idx1, knownVertices),
                     //     addVertex(mesh, attributes, idx2, knownVertices));
 
-                    owl::common::vec3i vidx(mesh->vertex.size(), mesh->vertex.size() + 1, mesh->vertex.size() + 2);
+                    VEC3i vidx(mesh->vertex.size(), mesh->vertex.size() + 1, mesh->vertex.size() + 2);
                     mesh->vertex.push_back(vertex_array[idx0.vertex_index]);
                     mesh->vertex.push_back(vertex_array[idx1.vertex_index]);
                     mesh->vertex.push_back(vertex_array[idx2.vertex_index]);
                     mesh->index.push_back(vidx);
 
-                    owl::common::vec3i nidx(mesh->normal.size(), mesh->normal.size() + 1, mesh->normal.size() + 2);
+                    VEC3i nidx(mesh->normal.size(), mesh->normal.size() + 1, mesh->normal.size() + 2);
                     mesh->normal.push_back(normal_array[idx0.normal_index]);
                     mesh->normal.push_back(normal_array[idx1.normal_index]);
                     mesh->normal.push_back(normal_array[idx2.normal_index]);
                     // mesh->index.push_back(nidx);
 
-                    owl::common::vec3i tidx(mesh->texcoord.size(), mesh->texcoord.size() + 1, mesh->texcoord.size() + 2);
+                    VEC3i tidx(mesh->texcoord.size(), mesh->texcoord.size() + 1, mesh->texcoord.size() + 2);
                     mesh->texcoord.push_back(texcoord_array[idx0.texcoord_index]);
                     mesh->texcoord.push_back(texcoord_array[idx1.texcoord_index]);
                     mesh->texcoord.push_back(texcoord_array[idx2.texcoord_index]);
                     // mesh->index.push_back(tidx);
 
-                    mesh->diffuse = (const owl::common::vec3f&)materials[materialID].diffuse;
+                    mesh->diffuse = (const VEC3f&)materials[materialID].diffuse;
                     mesh->diffuseTextureID = loadTexture(model,
                         knownTextures,
                         materials[materialID].diffuse_texname,
@@ -219,7 +219,7 @@ namespace osc {
                         materials[materialID].bump_texname,
                         modelDir);
 
-                    mesh->emit = (const owl::common::vec3f&)materials[materialID].emission;
+                    mesh->emit = (const VEC3f&)materials[materialID].emission;
                     mesh->materialID = materialID + 1;
                 }
 

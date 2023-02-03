@@ -4,16 +4,16 @@
 #include <helper_math.cuh>
 
 __device__
-owl::common::vec3f evaluate(owl::common::vec3f& wi, owl::common::vec3f& wo,
-	owl::common::vec3f& base_color, float alpha, owl::common::vec3f emittance)
+VEC3f evaluate(VEC3f& wi, VEC3f& wo,
+	VEC3f& base_color, float alpha, VEC3f emittance)
 {
 	float metalness = 1.;
 	float eta = 0.f;
 	float alpha2 = alpha * alpha;
-	owl::common::vec3f f0 = base_color;  // lerp between schlickf from eta
+	VEC3f f0 = base_color;  // lerp between schlickf from eta
 
-	owl::common::vec3f diffuse = diffuse_Lambert(wi, wo, base_color);
-	owl::common::vec3f specular = microfacetReflection_GGX(wi, wo, f0, eta, alpha2);
+	VEC3f diffuse = diffuse_Lambert(wi, wo, base_color);
+	VEC3f specular = microfacetReflection_GGX(wi, wo, f0, eta, alpha2);
 
 	float diffuseweight = 0.5f;
 	float specularweight = 0.5f;
@@ -23,12 +23,12 @@ owl::common::vec3f evaluate(owl::common::vec3f& wi, owl::common::vec3f& wo,
 
 
 __device__
-void computeLobeProbabilities(owl::common::vec3f& wo, float& pDiffuse, float& pSpecular, owl::common::vec3f base_colors,
+void computeLobeProbabilities(VEC3f& wo, float& pDiffuse, float& pSpecular, VEC3f base_colors,
 	float metalness)
 {
 	float eta = 0.;
-	owl::common::vec3f f0 = base_colors;
-	owl::common::vec3f fresnel = Fr_Schlick(abs(cosTheta(wo)), f0);
+	VEC3f f0 = base_colors;
+	VEC3f fresnel = Fr_Schlick(abs(cosTheta(wo)), f0);
 
 	float diffuseWeight = 0.5;
 	
@@ -47,13 +47,13 @@ float remap(float value, float low1, float high1, float low2, float high2) {
 }
 
 __device__
-owl::common::vec3f sample_direction(owl::common::vec3f& wo, float u1, float u2, float* pdf, 
-	owl::common::vec3f base_colors, float metalness, float alpha)
+VEC3f sample_direction(VEC3f& wo, float u1, float u2, float* pdf, 
+	VEC3f base_colors, float metalness, float alpha)
 {
 	float pDiffuse, pSpecular;
 
 	computeLobeProbabilities(wo, pDiffuse, pSpecular, base_colors, metalness);
-	owl::common::vec3f wi;
+	VEC3f wi;
 	pDiffuse = 1.f;
 	if (u1 < pDiffuse)
 	{
@@ -71,15 +71,15 @@ owl::common::vec3f sample_direction(owl::common::vec3f& wo, float u1, float u2, 
 			pDiffuse, pDiffuse + pSpecular - EPS,
 			0.0f, 1 - EPS);
 
-		owl::common::vec3f wo_upper = (float)copysign(1., cosTheta(wo)) * wo; // sign(+wo) * +wo = +wo, sign(-wo) * -wo = +wo
-		owl::common::vec3f wh = (float)copysign(1., cosTheta(wo)) * sampleGGX_VNDF(wo_upper, alpha, u1, u2);
+		VEC3f wo_upper = (float)copysign(1., cosTheta(wo)) * wo; // sign(+wo) * +wo = +wo, sign(-wo) * -wo = +wo
+		VEC3f wh = (float)copysign(1., cosTheta(wo)) * sampleGGX_VNDF(wo_upper, alpha, u1, u2);
 		if (dot(wo, wh) < 0.0f) {
-			return owl::common::vec3f(0.0f);
+			return VEC3f(0.0f);
 		}
 		// reflect
 		wi = 2.0f * wh * dot(wh, wo) - wh;
 		if (!sameHemisphere(wi, wo)) {
-			return owl::common::vec3f(0.0f);
+			return VEC3f(0.0f);
 		}
 	}
 	if (pdf)
@@ -91,8 +91,8 @@ owl::common::vec3f sample_direction(owl::common::vec3f& wo, float u1, float u2, 
 }
 
 __device__
-float pdf(owl::common::vec3f& wi, owl::common::vec3f& wo,
-	owl::common::vec3f base_colors, float metalness, float alpha)
+float pdf(VEC3f& wi, VEC3f& wo,
+	VEC3f base_colors, float metalness, float alpha)
 {
 	float eta = 1.f;
 

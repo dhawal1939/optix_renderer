@@ -19,6 +19,7 @@
 #include <owl/owl.h>
 #include <owl/common/math/AffineSpace.h>
 #include <vector>
+#include <common.h>
 
 /*! \namespace osc - Optix Siggraph Course */
 namespace osc
@@ -27,23 +28,23 @@ namespace osc
         render */
     struct TriangleMesh
     {
-        std::vector<owl::common::vec3f> vertex;
-        std::vector<owl::common::vec3f> normal;
-        std::vector<owl::common::vec2f> texcoord;
-        std::vector<owl::common::vec3i> index;
+        std::vector<VEC3f> vertex;
+        std::vector<VEC3f> normal;
+        std::vector<VEC2f> texcoord;
+        std::vector<VEC3i> index;
 
         // material data:
-        owl::common::vec3f diffuse;
+        VEC3f diffuse;
         int diffuseTextureID{ -1 };
 
         float alpha; // roughness
         int alphaTextureID{ -1 };
 
-        owl::common::vec3f normal_map_vec;
+        VEC3f normal_map_vec;
         int normalTextureID{ -1 };
 
         unsigned int materialID;
-        owl::common::vec3f emit;
+        VEC3f emit;
 
         // Is light
         bool isLight{ false };
@@ -51,7 +52,7 @@ namespace osc
 
     struct QuadLight
     {
-        owl::common::vec3f origin, du, dv, power;
+        VEC3f origin, du, dv, power;
     };
 
     struct Texture
@@ -63,7 +64,7 @@ namespace osc
         }
 
         uint32_t* pixel{ nullptr };
-        owl::common::vec2i resolution{ -1 };
+        VEC2i resolution{ -1 };
     };
 
     struct Model

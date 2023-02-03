@@ -21,17 +21,17 @@
 
 
 __device__
-owl::common::vec3f ltcDirectLighingBaseline(SurfaceInteraction& si, LCGRand& rng)
+VEC3f ltcDirectLighingBaseline(SurfaceInteraction& si, LCGRand& rng)
 {
-    owl::common::vec3f wo_local = normalize(apply_mat(si.to_local, si.wo));
+    VEC3f wo_local = normalize(apply_mat(si.to_local, si.wo));
     if (wo_local.z < 0.f)
-        return owl::common::vec3f(0.f);
+        return VEC3f(0.f);
 
-    owl::common::vec3f normal_local(0.f, 0.f, 1.f);
-    owl::common::vec3f color(0.0, 0.0, 0.0);
+    VEC3f normal_local(0.f, 0.f, 1.f);
+    VEC3f color(0.0, 0.0, 0.0);
 
     /* Analytic shading via LTCs */
-    owl::common::vec3f ltc_mat[3], ltc_mat_inv[3];
+    VEC3f ltc_mat[3], ltc_mat_inv[3];
     float alpha = si.alpha;
     float theta = sphericalTheta(wo_local);
 
@@ -39,7 +39,7 @@ owl::common::vec3f ltcDirectLighingBaseline(SurfaceInteraction& si, LCGRand& rng
     fetchLtcMat(alpha, theta, ltc_mat, amplitude);
     matrixInverse(ltc_mat, ltc_mat_inv);
 
-    owl::common::vec3f iso_frame[3];
+    VEC3f iso_frame[3];
 
     iso_frame[0] = wo_local;
     iso_frame[0].z = 0.f;
@@ -59,13 +59,13 @@ owl::common::vec3f ltcDirectLighingBaseline(SurfaceInteraction& si, LCGRand& rng
 OPTIX_RAYGEN_PROGRAM(rayGen)()
 {
     const RayGenData& self = owl::getProgramData<RayGenData>();
-    const owl::common::vec2i pixelId = owl::getLaunchIndex();
+    const VEC2i pixelId = owl::getLaunchIndex();
     const int fbOfs = pixelId.x + self.frameBufferSize.x * pixelId.y;
 
     LCGRand rng = get_rng(optixLaunchParams.accumId + 10007, make_uint2(pixelId.x, pixelId.y),
         make_uint2(self.frameBufferSize.x, self.frameBufferSize.y));
 
-    const owl::common::vec2f screen = (owl::common::vec2f(pixelId) + owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng))) / owl::common::vec2f(self.frameBufferSize);
+    const VEC2f screen = (VEC2f(pixelId) + VEC2f(lcg_randomf(rng), lcg_randomf(rng))) / VEC2f(self.frameBufferSize);
     RadianceRay ray;
     ray.origin = optixLaunchParams.camera.pos;
     ray.direction = normalize(optixLaunchParams.camera.dir_00
@@ -77,24 +77,24 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
 
     {
         // Out going direction pointing towards the pixel location
-        si.wo = owl::normalize(ray.origin - si.p);
+        si.wo = normalize(ray.origin - si.p);
         // Initializes to_local from n_geo then obtains to_world by taking inverse of the to_local
         orthonormalBasis(si.n_geom, si.to_local, si.to_world);
         // obtain wo is in world space cam_pos - hit_loc_world get local frame of the wo as wo_local
         si.wo_local = normalize(apply_mat(si.to_local, si.wo));
     }
 
-    owl::common::vec3f color(0.f, 0.f, 0.f);
+    VEC3f color(0.f, 0.f, 0.f);
     struct triColor colors;
-    colors.colors[0] = owl::common::vec3f(0.f);
-    colors.colors[1] = owl::common::vec3f(0.f);
+    colors.colors[0] = VEC3f(0.f);
+    colors.colors[1] = VEC3f(0.f);
     if (si.hit == false)
     {
         color = si.diffuse;
         color = si.n_geom;
     }
     else if (optixLaunchParams.rendererType == MASK)
-        color = owl::common::vec3f(1., 1., 1.);
+        color = VEC3f(1., 1., 1.);
     else if (optixLaunchParams.rendererType == POSITION)
         color = si.p;
     else if (optixLaunchParams.rendererType == DIFFUSE)
@@ -124,7 +124,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         }
         else
         {
-            owl::common::vec3f ltc_color = ltcDirectLighingBaseline(si, rng);
+            VEC3f ltc_color = ltcDirectLighingBaseline(si, rng);
             int n = 4;
             for (int i = 0; i < n; i++)
             {
@@ -148,28 +148,24 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         if (si.isLight)
             color = si.emit;
         else
-           color = estimatePathTracing(si, rng, ray, 1);
+            color = estimatePathTracing(si, rng, ray, 1);
 
     }
     else {
-        color = owl::common::vec3f(1., 0., 0.);
+        color = VEC3f(1., 0., 0.);
     }
   
     if (optixLaunchParams.accumId > 0)
-        color = color + owl::common::vec3f(optixLaunchParams.accum_screen_buffer[fbOfs].x, optixLaunchParams.accum_screen_buffer[fbOfs].y,
-            optixLaunchParams.accum_screen_buffer[fbOfs].z);
+        color = color + VEC3f(optixLaunchParams.accum_screen_buffer[fbOfs].x, optixLaunchParams.accum_screen_buffer[fbOfs].y,
+            optixLaunchParams.accum_screen_buffer[fbOfs].z) * optixLaunchParams.accumId;
+    color = color / (optixLaunchParams.accumId + 1.f);
+    self.frameBuffer[fbOfs] = owl::make_rgba(color);
+
     optixLaunchParams.accum_screen_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
-    
     optixLaunchParams.position_screen_buffer[fbOfs] = make_float4(si.p.x, si.p.y, si.p.z, 1.f);
     optixLaunchParams.normal_screen_buffer[fbOfs] = make_float4(si.n_geom.x, si.n_geom.y, si.n_geom.z, 1.f);
     optixLaunchParams.albedo_screen_buffer[fbOfs] = make_float4(si.diffuse.x, si.diffuse.y, si.diffuse.z, 1.f);
     optixLaunchParams.alpha_screen_buffer[fbOfs] = make_float4(si.alpha, 0.f, 0.f, 1.f);
     optixLaunchParams.uv_screen_buffer[fbOfs] = make_float4(si.uv.x, si.uv.y, si.diffuse.z, 1.f);
     optixLaunchParams.materialID_screen_buffer[fbOfs] = make_float4(si.materialID, 0.f, 0.f, 1.f);
-
-
-
-    color = (1.f / (optixLaunchParams.accumId + 1.f)) * color;
-
-    self.frameBuffer[fbOfs] = owl::make_rgba(color);
 }

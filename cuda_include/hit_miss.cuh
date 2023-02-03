@@ -14,16 +14,16 @@
 OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
 {
     const TriangleMeshData& self = owl::getProgramData<TriangleMeshData>();
-    const owl::common::vec3i primitiveIndices = self.index[optixGetPrimitiveIndex()];
+    const VEC3i primitiveIndices = self.index[optixGetPrimitiveIndex()];
 
     SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
     si.hit = true;
     si.materialID = self.materialID;
 
     // area of triangle
-    owl::common::vec3f v1 = self.vertex[primitiveIndices.x];
-    owl::common::vec3f v2 = self.vertex[primitiveIndices.y];
-    owl::common::vec3f v3 = self.vertex[primitiveIndices.z];
+    VEC3f v1 = self.vertex[primitiveIndices.x];
+    VEC3f v2 = self.vertex[primitiveIndices.y];
+    VEC3f v3 = self.vertex[primitiveIndices.z];
     si.area = 0.5f * length(cross(v1 - v2, v3 - v2));
 
     // Exact hit point on the triangle
@@ -39,8 +39,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
     si.diffuse = self.diffuse;
     if (self.hasDiffuseTexture)
     {   
-        owl::common::vec4f diffuse = tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
-        si.diffuse = owl::common::vec3f(diffuse.x, diffuse.y, diffuse.z);
+        VEC4f diffuse = tex2D<float4>(self.diffuse_texture, si.uv.x, si.uv.y);
+        si.diffuse = VEC3f(diffuse.x, diffuse.y, diffuse.z);
     }
     si.alpha = self.alpha;
     si.alpha = owl::clamp(si.alpha, 0.01f, 1.f);
@@ -51,12 +51,13 @@ OPTIX_CLOSEST_HIT_PROGRAM(triangleMeshCH)()
 
 OPTIX_MISS_PROGRAM(miss)()
 {
-    const owl::common::vec2i pixelId = owl::getLaunchIndex();
+    const VEC2i pixelId = owl::getLaunchIndex();
     const MissProgData& self = owl::getProgramData<MissProgData>();
 
     SurfaceInteraction& si = owl::getPRD<SurfaceInteraction>();
     si.hit = false;
     si.isLight = false;
+    si.diffuse = self.const_color;
     si.materialID = 0;
     si.n_geom = owl::vec3f(0.);
     si.diffuse = self.const_color;

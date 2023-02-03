@@ -7,7 +7,7 @@
 #include <ltc/polygon_utils.cuh>
 
 __device__
-void fetchLtcMat(float alpha, float theta, owl::common::vec3f ltc_mat[3], float& amplitude)
+void fetchLtcMat(float alpha, float theta, VEC3f ltc_mat[3], float& amplitude)
 {
     theta = theta * 0.99f / (0.5 * PI);
 
@@ -15,15 +15,15 @@ void fetchLtcMat(float alpha, float theta, owl::common::vec3f ltc_mat[3], float&
     float4 r2 = tex2D<float4>(optixLaunchParams.ltc_2, theta, alpha);
     float4 r3 = tex2D<float4>(optixLaunchParams.ltc_3, theta, alpha);
 
-    ltc_mat[0] = owl::common::vec3f(r1.x, r1.y, r1.z);
-    ltc_mat[1] = owl::common::vec3f(r2.x, r2.y, r2.z);
-    ltc_mat[2] = owl::common::vec3f(r3.x, r3.y, r3.z);
+    ltc_mat[0] = VEC3f(r1.x, r1.y, r1.z);
+    ltc_mat[1] = VEC3f(r2.x, r2.y, r2.z);
+    ltc_mat[2] = VEC3f(r3.x, r3.y, r3.z);
 
     amplitude = r3.w;
 }
 
 __device__
-owl::common::vec3f integrateEdgeVec(owl::common::vec3f v1, owl::common::vec3f v2)
+VEC3f integrateEdgeVec(VEC3f v1, VEC3f v2)
 {
     float x = dot(v1, v2);
     float y = abs(x);
@@ -38,30 +38,30 @@ owl::common::vec3f integrateEdgeVec(owl::common::vec3f v1, owl::common::vec3f v2
 }
 
 __device__
-float integrateEdge(owl::common::vec3f v1, owl::common::vec3f v2)
+float integrateEdge(VEC3f v1, VEC3f v2)
 {
     return integrateEdgeVec(v1, v2).z;
 }
 
 __device__
-owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec3f ltc_mat[3],
-	owl::common::vec3f ltc_mat_inv[3], float amplitude,
-	owl::common::vec3f iso_frame[3], TriLight& triLight)
+VEC3f integrateOverPolygon(SurfaceInteraction& si, VEC3f ltc_mat[3],
+	VEC3f ltc_mat_inv[3], float amplitude,
+	VEC3f iso_frame[3], TriLight& triLight)
 {
-	owl::common::vec3f lv1 = triLight.v1;
-	owl::common::vec3f lv2 = triLight.v2;
-	owl::common::vec3f lv3 = triLight.v3;
-	owl::common::vec3f lemit = triLight.emit;
-	owl::common::vec3f lnormal = triLight.normal;
+	VEC3f lv1 = triLight.v1;
+	VEC3f lv2 = triLight.v2;
+	VEC3f lv3 = triLight.v3;
+	VEC3f lemit = triLight.emit;
+	VEC3f lnormal = triLight.normal;
 
 	// Move to origin and normalize
 	lv1 = owl::normalize(lv1 - si.p);
 	lv2 = owl::normalize(lv2 - si.p);
 	lv3 = owl::normalize(lv3 - si.p);
 
-	owl::common::vec3f cg = normalize(lv1 + lv2 + lv3);
+	VEC3f cg = normalize(lv1 + lv2 + lv3);
 	if (owl::dot(-cg, lnormal) < 0.f)
-		return owl::common::vec3f(0.f);
+		return VEC3f(0.f);
 
 	lv1 = owl::normalize(apply_mat(si.to_local, lv1));
 	lv2 = owl::normalize(apply_mat(si.to_local, lv2));
@@ -74,7 +74,7 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 	float diffuse_shading = 0.f;
 	float ggx_shading = 0.f;
 
-	owl::common::vec3f diff_clipped[5] = { lv1, lv2, lv3, lv1, lv1 };
+	VEC3f diff_clipped[5] = { lv1, lv2, lv3, lv1, lv1 };
 	int diff_vcount = clipPolygon(3, diff_clipped);
 
 	if (diff_vcount == 3) {
@@ -97,7 +97,7 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 	diff_clipped[3] = owl::normalize(apply_mat(ltc_mat_inv, lv1));
 	diff_clipped[4] = owl::normalize(apply_mat(ltc_mat_inv, lv1));
 
-	owl::common::vec3f ltc_clipped[5] = { diff_clipped[0], diff_clipped[1], diff_clipped[2], diff_clipped[3], diff_clipped[4] };
+	VEC3f ltc_clipped[5] = { diff_clipped[0], diff_clipped[1], diff_clipped[2], diff_clipped[3], diff_clipped[4] };
 	int ltc_vcount = clipPolygon(diff_vcount, ltc_clipped);
 
 	if (ltc_vcount == 3) {
@@ -122,6 +122,6 @@ owl::common::vec3f integrateOverPolygon(SurfaceInteraction& si, owl::common::vec
 		ggx_shading = owl::abs(ggx_shading);
 	}
 
-	owl::common::vec3f color = (si.diffuse * lemit * diffuse_shading) + (amplitude * lemit * ggx_shading);
+	VEC3f color = (si.diffuse * lemit * diffuse_shading) + (amplitude * lemit * ggx_shading);
 	return color;
 }

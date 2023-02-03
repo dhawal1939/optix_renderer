@@ -6,12 +6,12 @@
 //#include <helper_math.cuh>
 //
 //__device__
-//owl::common::vec3f sampleLight(int selectedLightIdx, owl::common::vec2f rand) {
+//VEC3f sampleLight(int selectedLightIdx, VEC2f rand) {
 //
 //    TriLight triLight = optixLaunchParams.triLights[selectedLightIdx];
-//    owl::common::vec3f lv1 = triLight.v1;
-//    owl::common::vec3f lv2 = triLight.v2;
-//    owl::common::vec3f lv3 = triLight.v3;
+//    VEC3f lv1 = triLight.v1;
+//    VEC3f lv2 = triLight.v2;
+//    VEC3f lv3 = triLight.v3;
 //    return samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
 //}
 //
@@ -45,11 +45,11 @@
 //*/
 //
 //__device__
-//owl::common::vec3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int max_ray_depth = 10)
+//VEC3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, int max_ray_depth = 10)
 //{
-//    owl::common::vec3f color(0.f, 0.f, 0.f);
+//    VEC3f color(0.f, 0.f, 0.f);
 //    SurfaceInteraction current_si = si;
-//    owl::common::vec3f tp(1.f, 1.f, 1.f);
+//    VEC3f tp(1.f, 1.f, 1.f);
 //    current_si.wo *= -1.;
 //    if (current_si.isLight)
 //    {
@@ -57,7 +57,7 @@
 //    }
 //
 //    if (max_ray_depth > 1)
-//        return owl::common::vec3f(1., 0., 0.);
+//        return VEC3f(1., 0., 0.);
 //
 //    for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
 //    {
@@ -69,13 +69,13 @@
 //            break;
 //        }
 //
-//        owl::common::vec2f rand1 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-//        owl::common::vec2f rand2 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-//        owl::common::vec3f V = owl::common::normalize(current_si.wo);
+//        VEC2f rand1 = VEC2f(lcg_randomf(rng), lcg_randomf(rng));
+//        VEC2f rand2 = VEC2f(lcg_randomf(rng), lcg_randomf(rng));
+//        VEC3f V = owl::common::normalize(current_si.wo);
 //        // going to the camera
 //
 //        int selectedLightIdx = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
-//        owl::common::vec3f brdf(0.);
+//        VEC3f brdf(0.);
 //        RadianceRay ray;
 //        SurfaceInteraction brdf_si{ 0 }, light_si{ 0 };
 //        // MIS
@@ -83,8 +83,8 @@
 //        {
 //            float lightPdf = sampleLightPdf(selectedLightIdx);
 //
-//            owl::common::vec3f newPos = sampleLight(selectedLightIdx, rand1);
-//            owl::common::vec3f L = owl::common::normalize(newPos - current_si.p);  // incoming from light
+//            VEC3f newPos = sampleLight(selectedLightIdx, rand1);
+//            VEC3f L = owl::common::normalize(newPos - current_si.p);  // incoming from light
 //
 //            ray.origin = current_si.p + current_si.n_geom * EPS;
 //            ray.direction = L;
@@ -98,10 +98,10 @@
 //                dist = dist * dist;
 //                
 //                float lightPdfW = pdfA2W(lightPdf, dist, NdotL);
-//                owl::common::vec3f H = normalize(L + V);
+//                VEC3f H = normalize(L + V);
 //
 //                // Local Frame
-//                owl::common::vec3f L_local, V_local, H_local;
+//                VEC3f L_local, V_local, H_local;
 //                orthonormalBasis(current_si.n_geom, current_si.to_local, current_si.to_world);
 //                V_local = normalize(apply_mat(current_si.to_local, V));
 //                H_local = normalize(apply_mat(current_si.to_local, H));
@@ -110,9 +110,9 @@
 //                float brdfPdf = get_brdf_pdf(current_si.alpha, current_si.alpha, V_local, normalize(L_local + V_local));
 //                // brdf pdf of current point
 //                //float metalness = 0.5f, reflectance = 0.5f;
-//                //owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - 
+//                //VEC3f f0 = 0.16f * reflectance * reflectance * (VEC3f(1.0f, 1.0f, 1.0f) - 
 //                // metalness) + current_si.diffuse * metalness;
-//                owl::common::vec3f brdf = evaluate_brdf(V_local, L_local, current_si.diffuse, current_si.alpha);
+//                VEC3f brdf = evaluate_brdf(V_local, L_local, current_si.diffuse, current_si.alpha);
 //
 //                float misW = balanceHeuristic(1, lightPdfW, 1, brdfPdf);
 //                
@@ -125,14 +125,14 @@
 //        }
 //        //BRDF Sampling
 //        {
-//            owl::common::vec3f L_local, V_local, H_local;
+//            VEC3f L_local, V_local, H_local;
 //            orthonormalBasis(current_si.n_geom, current_si.to_local, current_si.to_world);
 //            V_local = normalize(apply_mat(current_si.to_local, V));
 //            H_local = sample_GGX(rand2, current_si.alpha, current_si.alpha, V_local);
 //
-//            owl::common::vec3f H = normalize(apply_mat(current_si.to_world, H_local));
+//            VEC3f H = normalize(apply_mat(current_si.to_world, H_local));
 //
-//            owl::common::vec3f L = reflect(V, H);
+//            VEC3f L = reflect(V, H);
 //            L_local = normalize(apply_mat(current_si.to_local, L));
 //
 //            ray.origin = current_si.p + current_si.n_geom * EPS;
@@ -144,7 +144,7 @@
 //                return color;
 //            float NdotL = clampDot(current_si.n_geom, L, false);
 //            
-//            owl::common::vec3f brdf = evaluate_brdf(V_local, L_local, current_si.diffuse, current_si.alpha);
+//            VEC3f brdf = evaluate_brdf(V_local, L_local, current_si.diffuse, current_si.alpha);
 //            float brdfPdf = get_brdf_pdf(current_si.alpha, current_si.alpha, V_local, H);
 //            tp *= NdotL * brdf / brdfPdf;
 //            if (brdf_si.isLight) {

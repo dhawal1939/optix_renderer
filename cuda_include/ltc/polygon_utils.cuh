@@ -4,21 +4,21 @@
 /*! Returns the intersection of the line connecting the given two points with
 	the plane z == 0.0f.*/
 __device__
-owl::common::vec3f iz0(owl::common::vec3f lhs, owl::common::vec3f rhs)
+VEC3f iz0(VEC3f lhs, VEC3f rhs)
 {
 	float lerp_factor = lhs.z / (lhs.z - rhs.z);
 	// Equivalent to the following but I have trust issues regarding the
 	// stability of mix()
-	// return owl::common::vec3f(mix(lhs.xy, rhs.xy, lerp_factor), 0.0f);
+	// return VEC3f(mix(lhs.xy, rhs.xy, lerp_factor), 0.0f);
 
-	// return owl::common::vec3f(fma(owl::common::vec2(lerp_factor), rhs.xy, fma(-owl::common::vec2(lerp_factor), lhs.xy, lhs.xy)), 0.0f);
+	// return VEC3f(fma(VEC2(lerp_factor), rhs.xy, fma(-VEC2(lerp_factor), lhs.xy, lhs.xy)), 0.0f);
 
-	owl::common::vec2f a(lerp_factor, lerp_factor);
-	owl::common::vec2f b(rhs.x, rhs.y);
-	owl::common::vec2f c = -owl::common::vec2f(lerp_factor, lerp_factor) * owl::common::vec2f(lhs.x, lhs.y) + owl::common::vec2f(lhs.x, lhs.y);
-	owl::common::vec2f temp = a * b + c;
+	VEC2f a(lerp_factor, lerp_factor);
+	VEC2f b(rhs.x, rhs.y);
+	VEC2f c = -VEC2f(lerp_factor, lerp_factor) * VEC2f(lhs.x, lhs.y) + VEC2f(lhs.x, lhs.y);
+	VEC2f temp = a * b + c;
 
-	return normalize(owl::common::vec3f(temp.x, temp.y, 0.f));
+	return normalize(VEC3f(temp.x, temp.y, 0.f));
 }
 
 
@@ -30,7 +30,7 @@ owl::common::vec3f iz0(owl::common::vec3f lhs, owl::common::vec3f rhs)
 	output. vertex_count must be at least
 	MIN_POLYGON_VERTEX_COUNT_BEFORE_CLIPPING.*/
 __device__
-int clipPolygon(int vertex_count, owl::common::vec3f v[5])
+int clipPolygon(int vertex_count, VEC3f v[5])
 {
 	if (vertex_count == 0)
 		return 0;

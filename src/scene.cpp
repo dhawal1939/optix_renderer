@@ -60,9 +60,9 @@ bool parseScene(std::string sceneFile, Scene& scene)
         {
             SceneCamera cam;
 
-            cam.from = owl::common::vec3f(camera["from"][0], camera["from"][1], camera["from"][2]);
-            cam.at = owl::common::vec3f(camera["to"][0], camera["to"][1], camera["to"][2]);
-            cam.up = owl::common::vec3f(camera["up"][0], camera["up"][1], camera["up"][2]);
+            cam.from = VEC3f(camera["from"][0], camera["from"][1], camera["from"][2]);
+            cam.at = VEC3f(camera["to"][0], camera["to"][1], camera["to"][2]);
+            cam.up = VEC3f(camera["up"][0], camera["up"][1], camera["up"][2]);
             cam.cosFovy = float(camera["cos_fovy"]);
 
             scene.cameras.push_back(cam);

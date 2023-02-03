@@ -62,10 +62,10 @@ typedef owl::RayT<0, 2> RadianceRay;
 #endif
 
 struct TriLight {
-	owl::common::vec3f v1, v2, v3;
-	owl::common::vec3f cg;
-	owl::common::vec3f normal;
-	owl::common::vec3f emit;
+	VEC3f v1, v2, v3;
+	VEC3f cg;
+	VEC3f normal;
+	VEC3f emit;
 
 	//float flux;
 	float area;
@@ -79,7 +79,7 @@ struct MeshLight {
 
 struct LaunchParams {
 	bool clicked;
-	owl::common::vec2i pixelId;
+	VEC2i pixelId;
 
 	float4* position_screen_buffer;
 	float4* normal_screen_buffer;
@@ -111,10 +111,10 @@ struct LaunchParams {
 	int numMeshLights;
 
 	struct {
-		owl::common::vec3f pos;
-		owl::common::vec3f dir_00;
-		owl::common::vec3f dir_du;
-		owl::common::vec3f dir_dv;
+		VEC3f pos;
+		VEC3f dir_00;
+		VEC3f dir_du;
+		VEC3f dir_dv;
 	} camera;
 
 	float lerp;
@@ -124,20 +124,20 @@ __constant__ LaunchParams optixLaunchParams;
 
 struct RayGenData {
 	uint32_t* frameBuffer;
-	owl::common::vec2i frameBufferSize;
+	VEC2i frameBufferSize;
 };
 
 struct TriangleMeshData {
-	owl::common::vec3f* vertex;
-	owl::common::vec3f* normal;
-	owl::common::vec3i* index;
-	owl::common::vec2f* texCoord;
+	VEC3f* vertex;
+	VEC3f* normal;
+	VEC3i* index;
+	VEC2f* texCoord;
 
 	bool isLight;
-	owl::common::vec3f emit;
+	VEC3f emit;
 	unsigned int materialID;
 
-	owl::common::vec3f diffuse;
+	VEC3f diffuse;
 	bool hasDiffuseTexture;
 	cudaTextureObject_t diffuse_texture;
 
@@ -151,33 +151,36 @@ struct TriangleMeshData {
 };
 
 struct MissProgData {
-	owl::common::vec3f const_color;
+	VEC3f const_color;
 };
 
 struct ShadowRayData {
-	owl::common::vec3f visibility = owl::common::vec3f(0.f);
-	owl::common::vec3f point = owl::common::vec3f(0.f), normal_screen_buffer = owl::common::vec3f(0.f), cg = owl::common::vec3f(0.f);
+	VEC3f visibility = VEC3f(0.f);
+	VEC3f point = VEC3f(0.f), normal_screen_buffer = VEC3f(0.f), cg = VEC3f(0.f);
 };
 
 
 struct SurfaceInteraction {
 	bool hit = false;
 
-	owl::common::vec3f p = owl::common::vec3f(0.f);
-	owl::common::vec2f uv = owl::common::vec2f(0.f);
-	owl::common::vec3f wo = owl::common::vec3f(0.f), wi = owl::common::vec3f(0.f);
-	owl::common::vec3f wo_local = owl::common::vec3f(0.f), wi_local = owl::common::vec3f(0.f);
+	VEC3f p = VEC3f(0.f);
+	VEC2f uv = VEC2f(0.f);
+	VEC3f wo = VEC3f(0.f), wi = VEC3f(0.f);
+	VEC3f wo_local = VEC3f(0.f), wi_local = VEC3f(0.f);
+	
+	float spec_exponent;
+	float spec_intensity;
 
 	unsigned int materialID;
 
-	owl::common::vec3f n_geom = owl::common::vec3f(0.f), n_shad = owl::common::vec3f(0.f);
+	VEC3f n_geom = VEC3f(0.f), n_shad = VEC3f(0.f);
 
-	owl::common::vec3f diffuse = owl::common::vec3f(0.f);
+	VEC3f diffuse = VEC3f(0.f);
 	float alpha = 0.f;
 
-	owl::common::vec3f emit = owl::common::vec3f(0.f);
+	VEC3f emit = VEC3f(0.f);
 	bool isLight = false;
 
 	float area = 0.f;
-	owl::common::vec3f to_local[3], to_world[3];
+	VEC3f to_local[3], to_world[3];
 };

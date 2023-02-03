@@ -4,17 +4,35 @@
 #include <path/path.cuh>
 
 struct triColor{
-    owl::common::vec3f colors[2];
+    VEC3f colors[2];
 };
+
+__device__
+VEC3f sampleLight1(int selectedLightIdx, VEC2f rand) {
+
+    TriLight triLight = optixLaunchParams.triLights[selectedLightIdx];
+    VEC3f lv1 = triLight.v1;
+    VEC3f lv2 = triLight.v2;
+    VEC3f lv3 = triLight.v3;
+    return samplePointOnTriangle(lv1, lv2, lv3, rand.x, rand.y);
+}
+
+__device__
+float sampleLightPdf1(int selectedLightIdx)
+{
+    // Area calucation
+    TriLight triLight = optixLaunchParams.triLights[selectedLightIdx];
+    return 1 / (triLight.area * optixLaunchParams.numTriLights);
+}
 
 __device__
 struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max_ray_depth = 1)
 {
-    owl::common::vec3f color(0.f, 0.f, 0.f);
-    owl::common::vec3f sto_illum(0.f);
+    VEC3f color(0.f, 0.f, 0.f);
+    VEC3f sto_illum(0.f);
     SurfaceInteraction current_si = si;
-    owl::common::vec3f tp(1.f, 1.f, 1.f);
-    owl::common::vec3f V = current_si.wo; // here is going from x towards camera at the start
+    VEC3f tp(1.f, 1.f, 1.f);
+    VEC3f V = current_si.wo; // here is going from x towards camera at the start
     for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
     {
         if (!current_si.hit)
@@ -26,8 +44,8 @@ struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max
             sto_illum = current_si.emit * tp;
             break;
         }
-        owl::common::vec2f rand1 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
-        owl::common::vec2f rand2 = owl::common::vec2f(lcg_randomf(rng), lcg_randomf(rng));
+        VEC2f rand1 = VEC2f(lcg_randomf(rng), lcg_randomf(rng));
+        VEC2f rand2 = VEC2f(lcg_randomf(rng), lcg_randomf(rng));
         // going to the camera
 
         int selectedLightIdx = lcg_randomf(rng) * (optixLaunchParams.numTriLights - 1);
@@ -37,10 +55,10 @@ struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max
         // Light sampling
         {
 
-            float lightPdf = sampleLightPdf(selectedLightIdx);
+            float lightPdf = sampleLightPdf1(selectedLightIdx);
 
-            owl::common::vec3f newPos = sampleLight(selectedLightIdx, rand1);
-            owl::common::vec3f L = owl::common::normalize(newPos - current_si.p);  // incoming from light
+            VEC3f newPos = sampleLight1(selectedLightIdx, rand1);
+            VEC3f L = owl::common::normalize(newPos - current_si.p);  // incoming from light
             float dist = owl::common::length(newPos - current_si.p);
             dist = dist * dist;
 
@@ -50,12 +68,12 @@ struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max
             owl::traceRay(optixLaunchParams.world, ray, light_si);
             float lightPdfW = pdfA2W(lightPdf, dist, dot(-L, light_si.n_geom)); // check if -L is required or just L works
 
-            owl::common::vec3f H = normalize(L + V);
+            VEC3f H = normalize(L + V);
             float brdfPdf = 0.; // get_brdf_pdf(current_si.alpha, V, current_si.n_geom, H, L); // brdf pdf of current point
             float metalness = 0.5f, reflectance = 0.5f;
-            owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
+            VEC3f f0 = 0.16f * reflectance * reflectance * (VEC3f(1.0f, 1.0f, 1.0f) - metalness) +
                 current_si.diffuse * metalness;
-            owl::common::vec3f brdf = owl::common::vec3f(0.);//evaluate_brdf(V, current_si.n_geom, L, owl::common::vec3f(1.), current_si.alpha, owl::common::vec3f(1.)); // brdf of current point
+            VEC3f brdf = VEC3f(0.);//evaluate_brdf(V, current_si.n_geom, L, VEC3f(1.), current_si.alpha, VEC3f(1.)); // brdf of current point
             float misW = balanceHeuristic(1, lightPdfW, 1, brdfPdf);
             if (light_si.isLight) {
                 color += misW * light_si.emit * tp * brdf * clampDot(current_si.n_geom, L, false) / lightPdfW;
@@ -67,10 +85,10 @@ struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max
         }
         //BRDF Sampling
         //{
-        //    owl::common::vec3f H = sample_GGX(rand2, current_si.alpha, current_si.n_geom); // do all in global
+        //    VEC3f H = sample_GGX(rand2, current_si.alpha, current_si.n_geom); // do all in global
 
-        //    //owl::common::vec3f L = owl::common::normalize(2.f * owl::common::dot(V, H) * H - V);
-        //    owl::common::vec3f L = owl::common::normalize(-V - 2.f * owl::common::dot(-V, H) * H);
+        //    //VEC3f L = owl::common::normalize(2.f * owl::common::dot(V, H) * H - V);
+        //    VEC3f L = owl::common::normalize(-V - 2.f * owl::common::dot(-V, H) * H);
 
         //    ray.origin = current_si.p + EPS * current_si.n_geom;
         //    ray.direction = L;
@@ -78,9 +96,9 @@ struct triColor ratio_based_shadow(SurfaceInteraction& si, LCGRand& rng, int max
         //    owl::traceRay(optixLaunchParams.world, ray, brdf_si);
 
         //    float metalness = 0.5f, reflectance = 0.5f;
-        //    owl::common::vec3f f0 = 0.16f * reflectance * reflectance * (owl::common::vec3f(1.0f, 1.0f, 1.0f) - metalness) +
+        //    VEC3f f0 = 0.16f * reflectance * reflectance * (VEC3f(1.0f, 1.0f, 1.0f) - metalness) +
         //        current_si.diffuse * metalness;
-        //    owl::common::vec3f brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_si.alpha, f0);
+        //    VEC3f brdf = evaluate_brdf(V, current_si.n_geom, L, current_si.diffuse, current_si.alpha, f0);
         //    float brdfPdf = get_brdf_pdf(current_si.alpha, V, current_si.n_geom, H, L);
 
 

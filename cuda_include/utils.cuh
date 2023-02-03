@@ -7,7 +7,7 @@
 #include <owl/common/math/vec.h>
 #include <texture_fetch_functions.h>
 __device__
-owl::common::vec3f barycentricInterpolate(owl::common::vec3f* tex, owl::common::vec3i index)
+VEC3f barycentricInterpolate(VEC3f* tex, VEC3i index)
 {
     float u = optixGetTriangleBarycentrics().x;
     float v = optixGetTriangleBarycentrics().y;
@@ -18,7 +18,7 @@ owl::common::vec3f barycentricInterpolate(owl::common::vec3f* tex, owl::common::
 }
 
 __device__
-owl::common::vec2f barycentricInterpolate(owl::common::vec2f* tex, owl::common::vec3i index)
+VEC2f barycentricInterpolate(VEC2f* tex, VEC3i index)
 {
     float u = optixGetTriangleBarycentrics().x;
     float v = optixGetTriangleBarycentrics().y;
@@ -29,22 +29,22 @@ owl::common::vec2f barycentricInterpolate(owl::common::vec2f* tex, owl::common::
 }
 
 __device__
-owl::common::vec3f uniformSampleHemisphere(owl::common::vec2f rand)
+VEC3f uniformSampleHemisphere(VEC2f rand)
 {
     float z = rand.x;
     float r = owl::sqrt(owl::max(0.f, 1.f - z * z));
     float phi = 2.f * PI * rand.y;
 
-    return normalize(owl::common::vec3f(r * cos(phi), r * sin(phi), z));
+    return normalize(VEC3f(r * cos(phi), r * sin(phi), z));
 }
 
 __device__
-owl::common::vec2f ConcentricSampleDisk(owl::common::vec2f rand) {
+VEC2f ConcentricSampleDisk(VEC2f rand) {
     // Map uniform random numbers to $[-1,1]^2$
-    owl::common::vec2f uOffset = 2.f * rand - owl::common::vec2f(1, 1);
+    VEC2f uOffset = 2.f * rand - VEC2f(1, 1);
 
     // Handle degeneracy at the origin
-    if (uOffset.x == 0 && uOffset.y == 0) return owl::common::vec2f(0, 0);
+    if (uOffset.x == 0 && uOffset.y == 0) return VEC2f(0, 0);
 
     // Apply concentric mapping to point
     float theta, r;
@@ -56,25 +56,25 @@ owl::common::vec2f ConcentricSampleDisk(owl::common::vec2f rand) {
         r = uOffset.y;
         theta = PI / 2.f - PI / 4.f * (uOffset.x / uOffset.y);
     }
-    return r * owl::common::vec2f(owl::cos(theta), owl::sin(theta));
+    return r * VEC2f(owl::cos(theta), owl::sin(theta));
 }
 
 __device__
-owl::common::vec3f CosineSampleHemisphere(owl::common::vec2f rand) {
-    owl::common::vec2f d = ConcentricSampleDisk(rand);
+VEC3f CosineSampleHemisphere(VEC2f rand) {
+    VEC2f d = ConcentricSampleDisk(1);
     float z = owl::sqrt(owl::max(0.f, 1.f - d.x * d.x - d.y * d.y));
-    return normalize(owl::common::vec3f(d.x, d.y, z));
+    return normalize(VEC3f(d.x, d.y, z));
 }
 
 __device__
-owl::common::vec3f apply_mat(owl::common::vec3f mat[3], owl::common::vec3f v)
+VEC3f apply_mat(VEC3f mat[3], VEC3f v)
 {
-    owl::common::vec3f result(dot(mat[0], v), dot(mat[1], v), dot(mat[2], v));
+    VEC3f result(dot(mat[0], v), dot(mat[1], v), dot(mat[2], v));
     return result;
 }
 
 __device__
-void matrixInverse(owl::common::vec3f m[3], owl::common::vec3f minv[3]) {
+void matrixInverse(VEC3f m[3], VEC3f minv[3]) {
     int indxc[3], indxr[3];
     int ipiv[3] = { 0, 0, 0 };
 
@@ -139,7 +139,7 @@ void matrixInverse(owl::common::vec3f m[3], owl::common::vec3f minv[3]) {
 
 
 __device__
-void matrixTranspose(owl::common::vec3f m[3], owl::common::vec3f mTrans[3]) {
+void matrixTranspose(VEC3f m[3], VEC3f mTrans[3]) {
     mTrans[0] = m[0];
     mTrans[1] = m[1];
     mTrans[2] = m[2];
@@ -156,29 +156,29 @@ void matrixTranspose(owl::common::vec3f m[3], owl::common::vec3f mTrans[3]) {
 
 
 __device__
-owl::common::vec3f getPerpendicularVector(owl::common::vec3f _vec)
+VEC3f getPerpendicularVector(VEC3f _vec)
 {
-    owl::common::vec3f x = owl::common::dot(_vec, owl::common::vec3f(0.f, 0.f, 1.f)) < 
-        owl::common::dot(_vec, owl::common::vec3f(0.f, 1.f, 0.f)) ?
-        owl::common::vec3f(0.f, 0.f, 1.f) : owl::common::vec3f(0.f, 1.f, 0.f);
-    return (owl::common::dot(_vec, x) < owl::common::dot(x, owl::common::vec3f(1.f, 0., 0.)) ? x : owl::common::vec3f(1., 0., 0.));
+    VEC3f x = owl::common::dot(_vec, VEC3f(0.f, 0.f, 1.f)) < 
+        owl::common::dot(_vec, VEC3f(0.f, 1.f, 0.f)) ?
+        VEC3f(0.f, 0.f, 1.f) : VEC3f(0.f, 1.f, 0.f);
+    return (owl::common::dot(_vec, x) < owl::common::dot(x, VEC3f(1.f, 0., 0.)) ? x : VEC3f(1., 0., 0.));
 }
 
 __device__
-void orthonormalBasis(owl::common::vec3f n, owl::common::vec3f mat[3], owl::common::vec3f invmat[3])
+void orthonormalBasis(VEC3f n, VEC3f mat[3], VEC3f invmat[3])
 {
-    owl::common::vec3f c1, c2, c3;
+    VEC3f c1, c2, c3;
     if (n.z < -0.999999f)
     {
-        c1 = owl::common::vec3f(0, -1, 0);
-        c2 = owl::common::vec3f(-1, 0, 0);
+        c1 = VEC3f(0, -1, 0);
+        c2 = VEC3f(-1, 0, 0);
     }
     else
     {
         float a = 1. / (1. + n.z);
         float b = -n.x * n.y * a;
-        c1 = owl::common::normalize(owl::common::vec3f(1. - n.x * n.x * a, b, -n.x));
-        c2 = owl::common::normalize(owl::common::vec3f(b, 1. - n.y * n.y * a, -n.y));
+        c1 = owl::common::normalize(VEC3f(1. - n.x * n.x * a, b, -n.x));
+        c2 = owl::common::normalize(VEC3f(b, 1. - n.y * n.y * a, -n.y));
     }
     c3 = n;
 
@@ -191,7 +191,7 @@ void orthonormalBasis(owl::common::vec3f n, owl::common::vec3f mat[3], owl::comm
 
 
 __device__
-owl::common::vec3f samplePointOnTriangle(owl::common::vec3f v1, owl::common::vec3f v2, owl::common::vec3f v3,
+VEC3f samplePointOnTriangle(VEC3f v1, VEC3f v2, VEC3f v3,
     float u1, float u2)
 {
     float su1 = owl::sqrt(u1);
@@ -199,7 +199,7 @@ owl::common::vec3f samplePointOnTriangle(owl::common::vec3f v1, owl::common::vec
 }
 
 __device__
-float sphericalTheta(owl::common::vec3f p) {
+float sphericalTheta(VEC3f p) {
     return acos(p.z);
 }
 
@@ -214,11 +214,16 @@ float PowerHeuristic(int nf, float fPdf, int ng, float gPdf) {
     return (f * f) / (f * f + g * g);
 }
 
+__device__
+VEC3f reflect(VEC3f I, VEC3f N)
+{
+    return I - 2.0f * float(dot(N, I)) * N;
+}
 
 __device__
-owl::common::vec3f checkPositive(owl::common::vec3f toClip)
+VEC3f checkPositive(VEC3f toClip)
 {
-    owl::common::vec3f values(0.f);
+    VEC3f values(0.f);
     values.x = owl::common::max(toClip.x, 0.f);
     values.y = owl::common::max(toClip.y, 0.f);
     values.z = owl::common::max(toClip.z, 0.f);
