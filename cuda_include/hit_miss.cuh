@@ -59,6 +59,4 @@ OPTIX_MISS_PROGRAM(miss)()
     si.isLight = false;
     si.diffuse = self.const_color;
     si.materialID = 0;
-    si.n_geom = owl::vec3f(0.);
-    si.diffuse = self.const_color;
 }
