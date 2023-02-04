@@ -11,8 +11,8 @@ int main(int argc, char** argv)
 
     std::string currentScene;
 
-    //std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/rgb_test_scene.json";
-    std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/cornell_box.json";
+    std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/rgb_test_scene.json";
+    //std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/cornell_box.json";
 
 
     currentScene = defaultScene;

@@ -632,7 +632,7 @@ void Viewer::cameraChanged()
     const VEC3f lookUp = camera.getUp();
     const float cosFovy = camera.getCosFovy();
 
-    printf("Fovy, %f\n lookfrom %f %f %f\nlookat %f %f %f\nlookup %f %f %f\n",
+    printf("{\n\t\"cos_fovy\":%f,\n\t\"from\": [ %f, %f, %f],\n\t\"to\": [%f, %f, %f],\n\t\"up\": [%f, %f, %f]\n},\n",
         cosFovy, lookFrom.x, lookFrom.y, lookFrom.z, lookAt.x, lookAt.y, lookAt.z, lookUp.x, lookUp.y, lookUp.z);
 
     // ----------- compute variable values  ------------------

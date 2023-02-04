@@ -168,7 +168,7 @@ VEC3 brdf_value(VEC3 wi, VEC3 wo, VEC3 n, SurfaceInteraction& si)
 }
 
 __device__
-VEC3f integrate_lighting(SurfaceInteraction &si, LCGRand& rng, VEC3 wi)
+VEC3f integrate_lighting(SurfaceInteraction& si, LCGRand& rng, VEC3 wi, VEC3 &tp)
 {
     VEC3f lcol = VEC3f(0.);
     VEC2f rand1 = VEC2f(lcg_randomf(rng), lcg_randomf(rng));
@@ -178,11 +178,11 @@ VEC3f integrate_lighting(SurfaceInteraction &si, LCGRand& rng, VEC3 wi)
     // // LIGHT SAMPLE
     {
         VEC3 light = sampleLight(selectedLightIndx, rand1);
-        float light_pdf = -1.;
+        float light_pdf_val = -1.;
         float area = optixLaunchParams.triLights[selectedLightIndx].area;
-        VEC3 light_sample = sample_light(si, light, &light_pdf, rand1, area);
+        VEC3 light_sample = sample_light(si, light, &light_pdf_val, rand1, area);
 
-        if (light_pdf > 0.f)
+        if (light_pdf_val > 0.f)
         {
             float brdf_pdf_val = 0.f;
             float misWeight = 0.f;
@@ -193,60 +193,68 @@ VEC3f integrate_lighting(SurfaceInteraction &si, LCGRand& rng, VEC3 wi)
 
             SurfaceInteraction light_si = { 0 };
             ray.direction = light_sample; // for some reason it wants a - here.
-            ray.origin = si.p + si.n_geom* EPS;
+            ray.origin = si.p + light_sample * EPS;
             owl::traceRay(optixLaunchParams.world, ray, light_si);
+            
+            brdf_pdf_val = brdf_pdf(wi, light_sample, si);
+            brdf_val = brdf_value(wi, light_sample, si.n_geom, si);
+            cosine_term = abs(dot(light_sample, si.n_geom));
+            
             if(light_si.isLight)
             {
-                visibility = 1.f;
-                brdf_pdf_val = brdf_pdf(wi, light_sample, si);
-                misWeight = PowerHeuristic(1., light_pdf, 1., brdf_pdf_val);
-                brdf_val = brdf_value(wi, light_sample, si.n_geom, si);
-                cosine_term = abs(dot(light_sample, si.n_geom));
-                float pdf_term = misWeight / light_pdf;
                 le = light_si.emit;
+                visibility = 1.f;
+                misWeight = PowerHeuristic(1., light_pdf_val, 1., brdf_pdf_val);
+                float pdf_term = misWeight / light_pdf_val;
 
-                lcol += le * visibility * (si.spec_intensity * brdf_val) * cosine_term * pdf_term;
+                // Specular
+                VEC3 spec_color = (si.spec_intensity * brdf_val) * cosine_term;
                 // diffuse
-                lcol += le * visibility * (si.diffuse * INV_TWO_PI) * cosine_term * pdf_term;
-            }
+                VEC3 diffuse_color = (si.diffuse * INV_TWO_PI) * cosine_term;
+                lcol = spec_color + diffuse_color;
 
+                lcol += le * lcol * pdf_term * tp;
+            }
         }
     }
 
-    ////BRDF
+    // //BRDF
     {
         SurfaceInteraction brdf_si = { 0 };
-        float brdf_pdf = -1.;
-        VEC3f brdfSample = -sample_brdf(si, &brdf_pdf, rand2);
-        if (brdf_pdf > 0.)
+        float brdf_pdf_val = -1.;
+        VEC3f brdfSample = -sample_brdf(si, &brdf_pdf_val, rand2);// for some reason it wants a - here.
+        if (brdf_pdf_val > 0.)
         {
-            ray.direction = brdfSample; // for some reason it wants a - here.
-            ray.origin = si.p + si.n_geom * EPS;
+            ray.direction = brdfSample; 
+            ray.origin = si.p + brdfSample * EPS;
             owl::traceRay(optixLaunchParams.world, ray, brdf_si);
 
             float visibility = 0.;
             float light_pdf = 0.;
             float misWeight = 0.;
-            float cosine_term = 0;
-            VEC3 brdf_val = 0.;
-            VEC3 le = 0;
-            brdf_val = brdf_value(wi, brdfSample, si.n_geom, si);
+            float cosine_term = abs(dot(brdfSample, si.n_geom));
+
+            VEC3 brdf_val = brdf_value(wi, brdfSample, si.n_geom, si);
+
+            VEC3 le = VEC3(0);
 
             if(brdf_si.isLight)
             {
-                // we need to see current position(si.p) to light distance
-                visibility = 1.f;
-                light_pdf = sample_light_pdf(si.p, brdf_si);
-                misWeight = PowerHeuristic(1., brdf_pdf, 1., light_pdf);
-                cosine_term = abs(dot(brdfSample, si.n_geom));
-                float pdf_term = misWeight / brdf_pdf;
                 le = brdf_si.emit;
-                // specular
-                // Le V Brdf Cosine / pdf
-                lcol += le * visibility * (si.spec_intensity * brdf_val) * cosine_term * pdf_term;
-                // diffuse
-                lcol += le * visibility * (si.diffuse * INV_TWO_PI) * cosine_term * pdf_term;
+                light_pdf = sample_light_pdf(si.p, brdf_si);
+                misWeight = PowerHeuristic(1., brdf_pdf_val, 1., light_pdf);
+                float pdf_term = misWeight / brdf_pdf_val;
+               
+                // V Brdf Cosine / pdf
+                // Specular
+                VEC3 spec_color = (si.spec_intensity * brdf_val) * cosine_term;
+                // Diffuse
+                VEC3 diffuse_color = (si.diffuse * INV_TWO_PI) * cosine_term;
+                lcol += spec_color + diffuse_color;
+                lcol = le * lcol * pdf_term * tp; // multiply with stacked color with light
             }
+            tp = brdf_val * cosine_term / brdf_pdf_val;
+            si = brdf_si;
         }
 
     }
@@ -259,17 +267,20 @@ VEC3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, RadianceRay  ray
 {
     VEC3f color(0.f, 0.f, 0.f);
     VEC3f tp(1.f, 1.f, 1.f);
-    for (int ray_depth = 0; ray_depth < 1; ray_depth++)
+    max_ray_depth = 2;
+
+    for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
     {
         VEC3f V = si.wo; 
         if (si.hit)
-        {
+        {   
+            VEC3 current_hit_point = si.p;
             si.spec_exponent = floor(max(1., (1. - pow(si.alpha, .15)) * 40000.));
-            si.spec_intensity = 1.;
+            si.spec_intensity = 10.;
 
-            color += integrate_lighting(si, rng, V);
-            ray.direction = reflect(si.wo, si.n_geom);
-            ray.origin = si.p + EPS * si.wo;
+            color += integrate_lighting(si, rng, V, tp);
+            si.wo = owl::normalize(current_hit_point - si.p);
+            si.p = si.p + EPS * si.wo;
         }
         else
             break;
