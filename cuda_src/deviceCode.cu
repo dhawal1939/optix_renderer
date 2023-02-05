@@ -150,7 +150,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
             color = si.emit;
         else
         {
-            bi = estimatePathTracing(si, rng, ray, 3);
+            SurfaceInteraction dummy_si = si;
+            bi = estimatePathTracing(dummy_si, rng, ray, 3);
             color = bi.final_color;
         }
 
