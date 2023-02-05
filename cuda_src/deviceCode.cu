@@ -86,6 +86,7 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
 
     VEC3f color(0.f, 0.f, 0.f);
     struct triColor colors;
+    struct bounce_info bi = { 0 };
     colors.colors[0] = VEC3f(0.f);
     colors.colors[1] = VEC3f(0.f);
     if (si.hit == false)
@@ -148,7 +149,10 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
         if (si.isLight)
             color = si.emit;
         else
-            color = estimatePathTracing(si, rng, ray, 1);
+        {
+            bi = estimatePathTracing(si, rng, ray, 3);
+            color = bi.final_color;
+        }
 
     }
     else {
@@ -156,9 +160,26 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     }
   
     if (optixLaunchParams.accumId > 0)
+    {
         color = color + VEC3f(optixLaunchParams.accum_screen_buffer[fbOfs].x, optixLaunchParams.accum_screen_buffer[fbOfs].y,
             optixLaunchParams.accum_screen_buffer[fbOfs].z) * optixLaunchParams.accumId;
-    color = color / (optixLaunchParams.accumId + 1.f);
+        color = color / (optixLaunchParams.accumId + 1.f);
+
+        // bounce0
+        bi.bounce_info[0] = bi.bounce_info[0] + VEC3f(optixLaunchParams.bounce0_screen_buffer[fbOfs].x, optixLaunchParams.bounce0_screen_buffer[fbOfs].y,
+            optixLaunchParams.bounce0_screen_buffer[fbOfs].z) * optixLaunchParams.accumId;
+        bi.bounce_info[0] = bi.bounce_info[0] / (optixLaunchParams.accumId + 1.f);
+
+        // bounce1bounce
+        bi.bounce_info[1] = bi.bounce_info[1] + VEC3f(optixLaunchParams.bounce1_screen_buffer[fbOfs].x, optixLaunchParams.bounce1_screen_buffer[fbOfs].y,
+            optixLaunchParams.bounce1_screen_buffer[fbOfs].z) * optixLaunchParams.accumId;
+        bi.bounce_info[1] = bi.bounce_info[1] / (optixLaunchParams.accumId + 1.f);
+        
+        // bounce2
+        bi.bounce_info[2] = bi.bounce_info[2] + VEC3f(optixLaunchParams.bounce2_screen_buffer[fbOfs].x, optixLaunchParams.bounce2_screen_buffer[fbOfs].y,
+            optixLaunchParams.bounce2_screen_buffer[fbOfs].z) * optixLaunchParams.accumId;
+        bi.bounce_info[2] = bi.bounce_info[2] / (optixLaunchParams.accumId + 1.f);
+    }
     self.frameBuffer[fbOfs] = owl::make_rgba(color);
 
     optixLaunchParams.accum_screen_buffer[fbOfs] = make_float4(color.x, color.y, color.z, 1.f);
@@ -168,4 +189,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
     optixLaunchParams.alpha_screen_buffer[fbOfs] = make_float4(si.alpha, 0.f, 0.f, 1.f);
     optixLaunchParams.uv_screen_buffer[fbOfs] = make_float4(si.uv.x, si.uv.y, si.diffuse.z, 1.f);
     optixLaunchParams.materialID_screen_buffer[fbOfs] = make_float4(si.materialID, 0.f, 0.f, 1.f);
+
+    optixLaunchParams.bounce0_screen_buffer[fbOfs] = make_float4(bi.bounce_info[0].x, bi.bounce_info[0].y, bi.bounce_info[0].z, 1.f);
+    optixLaunchParams.bounce1_screen_buffer[fbOfs] = make_float4(bi.bounce_info[1].x, bi.bounce_info[1].y, bi.bounce_info[1].z, 1.f);
+    optixLaunchParams.bounce2_screen_buffer[fbOfs] = make_float4(bi.bounce_info[2].x, bi.bounce_info[2].y, bi.bounce_info[2].z, 1.f);
 }

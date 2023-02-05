@@ -200,6 +200,11 @@ VEC3f integrate_lighting(SurfaceInteraction& si, LCGRand& rng, VEC3 wi, VEC3 &tp
             brdf_val = brdf_value(wi, light_sample, si.n_geom, si);
             cosine_term = abs(dot(light_sample, si.n_geom));
             
+            // Specular
+            VEC3 spec_color = brdf_val * cosine_term;
+            // diffuse
+            VEC3 diffuse_color = (si.diffuse * INV_TWO_PI) * cosine_term;
+
             if(light_si.isLight)
             {
                 le = light_si.emit;
@@ -207,13 +212,10 @@ VEC3f integrate_lighting(SurfaceInteraction& si, LCGRand& rng, VEC3 wi, VEC3 &tp
                 misWeight = PowerHeuristic(1., light_pdf_val, 1., brdf_pdf_val);
                 float pdf_term = misWeight / light_pdf_val;
 
-                // Specular
-                VEC3 spec_color = (si.spec_intensity * brdf_val) * cosine_term;
-                // diffuse
-                VEC3 diffuse_color = (si.diffuse * INV_TWO_PI) * cosine_term;
                 lcol = spec_color + diffuse_color;
-
                 lcol += le * lcol * pdf_term * tp;
+                tp = VEC3(-1);
+                return lcol;
             }
         }
     }
@@ -238,6 +240,10 @@ VEC3f integrate_lighting(SurfaceInteraction& si, LCGRand& rng, VEC3 wi, VEC3 &tp
 
             VEC3 le = VEC3(0);
 
+            // Specular
+            VEC3 spec_color = brdf_val * cosine_term;
+            // Diffuse
+            VEC3 diffuse_color = (si.diffuse * INV_TWO_PI) * cosine_term;
             if(brdf_si.isLight)
             {
                 le = brdf_si.emit;
@@ -246,14 +252,14 @@ VEC3f integrate_lighting(SurfaceInteraction& si, LCGRand& rng, VEC3 wi, VEC3 &tp
                 float pdf_term = misWeight / brdf_pdf_val;
                
                 // V Brdf Cosine / pdf
-                // Specular
-                VEC3 spec_color = (si.spec_intensity * brdf_val) * cosine_term;
-                // Diffuse
-                VEC3 diffuse_color = (si.diffuse * INV_TWO_PI) * cosine_term;
                 lcol += spec_color + diffuse_color;
                 lcol = le * lcol * pdf_term * tp; // multiply with stacked color with light
+                tp = VEC3(-1);
+                return lcol;
             }
-            tp = brdf_val * cosine_term / brdf_pdf_val;
+            // contribution of both specular and diffuse brdfs
+            tp *= spec_color / brdf_pdf_val;
+            //tp *= (spec_color + diffuse_color) / brdf_pdf_val;
             si = brdf_si;
         }
 
@@ -262,31 +268,43 @@ VEC3f integrate_lighting(SurfaceInteraction& si, LCGRand& rng, VEC3 wi, VEC3 &tp
 }
 
 
-__device__
-VEC3f estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, RadianceRay  ray, int max_ray_depth = 10)
+struct bounce_info
 {
-    VEC3f color(0.f, 0.f, 0.f);
-    VEC3f tp(1.f, 1.f, 1.f);
-    max_ray_depth = 2;
+    VEC3 bounce_info[3] = { 0 };
+    VEC3 final_color = { 0 };
+};
 
+__device__
+struct bounce_info estimatePathTracing(SurfaceInteraction& si, LCGRand& rng, RadianceRay  ray, int max_ray_depth = 10)
+{
+    struct bounce_info bi;
+    VEC3f tp(1.f, 1.f, 1.f);
     for (int ray_depth = 0; ray_depth < max_ray_depth; ray_depth++)
     {
         VEC3f V = si.wo; 
-        if (si.hit)
-        {   
-            VEC3 current_hit_point = si.p;
-            si.spec_exponent = floor(max(1., (1. - pow(si.alpha, .15)) * 40000.));
-            si.spec_intensity = 10.;
+        if (tp.x != -1.f)
+        {
+            if (si.hit)
+            {
+                VEC3 current_hit_point = si.p;
+                si.spec_exponent = floor(max(1., (1. - pow(si.alpha, .15)) * 40000.));
+                si.spec_intensity = 1.;
 
-            color += integrate_lighting(si, rng, V, tp);
-            si.wo = owl::normalize(current_hit_point - si.p);
-            si.p = si.p + EPS * si.wo;
+                if (ray_depth > 2) // return on bounce 3
+                    break;
+                bi.bounce_info[ray_depth] = integrate_lighting(si, rng, V, tp);
+                bi.final_color += bi.bounce_info[ray_depth];
+                si.wo = owl::normalize(current_hit_point - si.p);
+                si.p = si.p + EPS * si.wo;
+            }
+            else break;
         }
         else
+        {
             break;
+        }
     }
 
-    color = owl::common::max(color, VEC3(0));
-
-    return color;
+    //return color;
+    return bi;
 }

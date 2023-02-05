@@ -11,8 +11,8 @@ int main(int argc, char** argv)
 
     std::string currentScene;
 
-    std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/rgb_test_scene.json";
-    //std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/cornell_box.json";
+    //std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/rgb_test_scene.json";
+    std::string defaultScene = "C:/Users/dhawals/repos/scenes/scene_config/cornell_box.json";
 
 
     currentScene = defaultScene;
@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     VEC2i resolution(1024, 1024);
     printf("%d %d reso\n", resolution.x, resolution.y);
 
-    Viewer win(scene, resolution, PATH, false);
+    Viewer win(scene, resolution, PATH, true);
     printf("framebuffer reso %d %d\n", win.getScreenSize().x, win.getScreenSize().y);
 
     //win.to_save_file = savePath;
